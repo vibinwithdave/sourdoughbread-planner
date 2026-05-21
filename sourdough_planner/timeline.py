@@ -359,18 +359,18 @@ class TimelineGenerator:
                                          note=f'{cold_proof_hours} hours in fridge. '
                                               f'Longer = more flavor and lighter crumb.'))
 
-        # 15. Remove from Fridge (after cold proof hours elapse)
-        current_dt += timedelta(hours=cold_proof_hours)
-        timeline.append(self._make_entry('remove_from_fridge', current_dt,
-                                         note='Bake straight from fridge — no need to warm up.'))
-
-        # 15. Preheat Oven
+        # 15. Preheat Oven (starts 45 min before cold proof ends)
         preheat_duration = get_duration('preheat_oven')
-        # Preheat starts before baking time
-        preheat_start = current_dt - timedelta(minutes=preheat_duration)
+        cold_proof_end = current_dt + timedelta(hours=cold_proof_hours)
+        preheat_start = cold_proof_end - timedelta(minutes=preheat_duration)
         timeline.append(self._make_entry('preheat_oven', preheat_start,
                                          note=f'Start {preheat_duration} min before baking. '
                                               f'Preheat to 550°F with Dutch oven inside.'))
+
+        # 16. Remove from Fridge (after cold proof hours elapse)
+        current_dt = cold_proof_end
+        timeline.append(self._make_entry('remove_from_fridge', current_dt,
+                                         note='Bake straight from fridge — no need to warm up.'))
 
         # 16. Score and Bake (covered)
         timeline.append(self._make_entry('score_and_bake', current_dt,
