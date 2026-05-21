@@ -204,6 +204,52 @@ def generate_schedule():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@app.route('/api/recalculate', methods=['POST'])
+def recalculate_timeline():
+    """
+    Recalculate the timeline from an edited step onward.
+
+    Expects:
+        timeline: flat list of step dicts (the current timeline)
+        edited_step_index: index of the step that was edited
+        new_datetime: ISO datetime string for the edited step
+        temperature_f: kitchen temperature
+        cold_proof_hours: cold proof duration
+    """
+    try:
+        data = request.json or {}
+        timeline_flat = data.get('timeline', [])
+        edited_step_index = int(data.get('edited_step_index', 0))
+        new_datetime = data.get('new_datetime', '')
+        temperature_f = float(data.get('temperature_f', 70))
+        cold_proof_hours = float(data.get('cold_proof_hours', 24))
+        enabled_steps = data.get('enabled_steps', {})
+        custom_durations = data.get('custom_durations', {})
+
+        if not timeline_flat or not new_datetime:
+            return jsonify({'success': False, 'error': 'Missing timeline or new_datetime'}), 400
+
+        if edited_step_index < 0 or edited_step_index >= len(timeline_flat):
+            return jsonify({'success': False, 'error': 'Invalid step index'}), 400
+
+        updated_days = timeline_gen.recalculate_from_step(
+            timeline_flat=timeline_flat,
+            edited_step_index=edited_step_index,
+            new_datetime_str=new_datetime,
+            temperature_f=temperature_f,
+            cold_proof_hours=cold_proof_hours,
+            enabled_steps=enabled_steps,
+            custom_durations=custom_durations
+        )
+
+        return jsonify({'success': True, 'timeline': updated_days})
+
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))
     app.run(host='0.0.0.0', port=port, debug=False)

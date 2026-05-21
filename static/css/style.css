@@ -731,3 +731,212 @@ body {
 .form-group.primary-input select {
     cursor: pointer;
 }
+
+/* --- Timeline Header & Actions --- */
+.timeline-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.timeline-header-row h2 {
+    margin-bottom: 0;
+}
+
+.timeline-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 14px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: white;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.action-btn:hover {
+    background: var(--color-bg-alt);
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.action-btn .btn-icon {
+    font-size: 1rem;
+}
+
+.save-btn:hover {
+    background: #E8F5E9;
+    border-color: #4CAF50;
+    color: #2E7D32;
+}
+
+.export-btn:hover {
+    background: #E3F2FD;
+    border-color: #2196F3;
+    color: #1565C0;
+}
+
+.timeline-edit-hint {
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+    font-style: italic;
+    margin-bottom: 12px;
+}
+
+/* --- Editable Time --- */
+.editable-time {
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 3px;
+    transition: background 0.2s ease;
+}
+
+.editable-time:hover {
+    background: rgba(139, 69, 19, 0.1);
+    text-decoration: underline;
+}
+
+.time-edit-container {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+}
+
+.time-edit-date,
+.time-edit-input {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    padding: 3px 6px;
+    border: 1px solid var(--color-primary);
+    border-radius: 3px;
+    background: #FFFDF8;
+    outline: none;
+}
+
+.time-edit-date {
+    width: 130px;
+}
+
+.time-edit-input {
+    width: 90px;
+}
+
+.time-edit-confirm,
+.time-edit-cancel {
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 2px 6px;
+    border-radius: 3px;
+    transition: background 0.2s ease;
+}
+
+.time-edit-confirm {
+    color: #2E7D32;
+}
+
+.time-edit-confirm:hover {
+    background: #E8F5E9;
+}
+
+.time-edit-cancel {
+    color: #C62828;
+}
+
+.time-edit-cancel:hover {
+    background: #FFEBEE;
+}
+
+/* --- Saved Schedules --- */
+.saved-schedule-card {
+    padding: 14px 18px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    margin-bottom: 10px;
+    background: white;
+    transition: box-shadow 0.2s ease;
+}
+
+.saved-schedule-card:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.saved-schedule-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.saved-schedule-header strong {
+    font-size: 0.9rem;
+    color: var(--color-text);
+}
+
+.saved-date {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+}
+
+.saved-schedule-info {
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+    margin-bottom: 8px;
+}
+
+.saved-schedule-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.action-btn-sm {
+    padding: 4px 10px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border: 1px solid var(--color-border);
+    border-radius: 3px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.action-btn-sm:hover {
+    background: var(--color-bg-alt);
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.action-btn-sm.delete-btn:hover {
+    background: #FFEBEE;
+    border-color: #C62828;
+    color: #C62828;
+}
+
+@media (max-width: 768px) {
+    .timeline-header-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .time-edit-container {
+        flex-wrap: wrap;
+    }
+
+    .saved-schedule-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+}

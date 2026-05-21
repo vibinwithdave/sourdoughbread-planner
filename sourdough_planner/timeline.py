@@ -405,6 +405,157 @@ class TimelineGenerator:
 
         return self._group_by_day(timeline)
 
+    def recalculate_from_step(self, timeline_flat, edited_step_index, new_datetime_str,
+                              temperature_f=70, cold_proof_hours=24,
+                              enabled_steps=None, custom_durations=None,
+                              fold_interval_minutes=30):
+        """
+        Recalculate the timeline from an edited step onward.
+
+        Takes the flat timeline (list of step dicts), the index of the edited step,
+        and the new datetime for that step. All subsequent steps are recalculated
+        using the default timing offsets.
+
+        Args:
+            timeline_flat: List of step dicts (flat, not grouped by day)
+            edited_step_index: Index of the step that was edited
+            new_datetime_str: New ISO datetime string for the edited step
+            temperature_f: Kitchen temperature for bulk fermentation calc
+            cold_proof_hours: Cold proof duration
+            enabled_steps: Dict of toggleable step states
+            custom_durations: Dict of custom durations
+            fold_interval_minutes: Minutes between folds
+
+        Returns:
+            Updated timeline grouped by day
+        """
+        if enabled_steps is None:
+            enabled_steps = {}
+        if custom_durations is None:
+            custom_durations = {}
+
+        bulk_hours = self.estimate_bulk_fermentation_hours(temperature_f)
+        cold_proof_hours = max(1, min(48, cold_proof_hours))
+
+        def get_duration(step_id, default_key='default_duration_minutes'):
+            if step_id in custom_durations:
+                return custom_durations[step_id]
+            return self.STEP_DEFINITIONS[step_id].get(default_key, 0)
+
+        # Keep all steps up to and including the edited one unchanged
+        # Update the edited step's time
+        new_dt = datetime.fromisoformat(new_datetime_str)
+        timeline_flat[edited_step_index]['datetime'] = new_dt.isoformat()
+        timeline_flat[edited_step_index]['time_display'] = new_dt.strftime('%I:%M %p').lstrip('0')
+        timeline_flat[edited_step_index]['date_display'] = new_dt.strftime('%A, %B %d')
+
+        # Recalculate all steps after the edited one
+        current_dt = new_dt
+        edited_step_id = timeline_flat[edited_step_index]['step_id']
+
+        # Define the offset rules for each step transition
+        # Each step knows how much time passes before the NEXT step
+        for i in range(edited_step_index + 1, len(timeline_flat)):
+            prev_step_id = timeline_flat[i - 1]['step_id']
+            curr_step_id = timeline_flat[i]['step_id']
+
+            # Calculate the offset from the previous step
+            offset = self._get_offset_between_steps(
+                prev_step_id, curr_step_id,
+                get_duration=get_duration,
+                bulk_hours=bulk_hours,
+                cold_proof_hours=cold_proof_hours,
+                fold_interval_minutes=fold_interval_minutes,
+                temperature_f=temperature_f
+            )
+
+            current_dt = current_dt + timedelta(minutes=offset)
+
+            # Special case: preheat_oven is calculated relative to cold_proof end
+            if curr_step_id == 'preheat_oven':
+                # Find the cold_proof step to calculate preheat relative to it
+                cold_proof_entry = None
+                for j in range(i):
+                    if timeline_flat[j]['step_id'] == 'cold_proof':
+                        cold_proof_entry = timeline_flat[j]
+                if cold_proof_entry:
+                    cold_proof_start = datetime.fromisoformat(cold_proof_entry['datetime'])
+                    cold_proof_end = cold_proof_start + timedelta(hours=cold_proof_hours)
+                    preheat_duration = get_duration('preheat_oven')
+                    current_dt = cold_proof_end - timedelta(minutes=preheat_duration)
+
+            timeline_flat[i]['datetime'] = current_dt.isoformat()
+            timeline_flat[i]['time_display'] = current_dt.strftime('%I:%M %p').lstrip('0')
+            timeline_flat[i]['date_display'] = current_dt.strftime('%A, %B %d')
+
+        return self._group_by_day(timeline_flat)
+
+    def _get_offset_between_steps(self, prev_step_id, curr_step_id,
+                                   get_duration, bulk_hours, cold_proof_hours,
+                                   fold_interval_minutes, temperature_f):
+        """
+        Return the offset in minutes between two consecutive steps.
+        This encodes the same timing logic as generate_timeline.
+        """
+        # Feed starter -> Starter at peak: peak_hours (handled by caller)
+        # Starter at peak -> Mix dough: 0 (immediate)
+        if prev_step_id == 'starter_at_peak' and curr_step_id == 'mix_dough':
+            return 0
+        # Mix dough -> Rest after mix: mix duration (10 min)
+        if prev_step_id == 'mix_dough' and curr_step_id == 'rest_after_mix':
+            return get_duration('mix_dough')
+        # Rest after mix -> Stretch fold 1: rest duration (30 min)
+        if prev_step_id == 'rest_after_mix' and curr_step_id == 'stretch_fold_1':
+            return get_duration('rest_after_mix')
+        # Mix dough -> Stretch fold 1 (if rest is disabled): mix duration
+        if prev_step_id == 'mix_dough' and curr_step_id == 'stretch_fold_1':
+            return get_duration('mix_dough')
+        # Fold -> Fold: fold_interval
+        if 'stretch_fold' in prev_step_id and 'stretch_fold' in curr_step_id:
+            return fold_interval_minutes
+        # Last fold -> Bulk fermentation: fold_interval (30 min)
+        if 'stretch_fold' in prev_step_id and curr_step_id == 'bulk_fermentation':
+            return fold_interval_minutes
+        # Bulk fermentation -> Pre-shape: bulk_hours
+        if prev_step_id == 'bulk_fermentation' and curr_step_id == 'pre_shape':
+            return int(bulk_hours * 60)
+        # Pre-shape -> Bench rest: 5 min
+        if prev_step_id == 'pre_shape' and curr_step_id == 'bench_rest':
+            return 5
+        # Bench rest -> Final shape: bench duration (30 min)
+        if prev_step_id == 'bench_rest' and curr_step_id == 'final_shape':
+            return get_duration('bench_rest')
+        # Final shape -> Cold proof: final_shape duration (5 min)
+        if prev_step_id == 'final_shape' and curr_step_id == 'cold_proof':
+            return get_duration('final_shape')
+        # Cold proof -> Preheat oven: handled specially above
+        if prev_step_id == 'cold_proof' and curr_step_id == 'preheat_oven':
+            return 0  # Will be overridden by special case
+        # Preheat oven -> Remove from fridge: preheat_duration
+        if prev_step_id == 'preheat_oven' and curr_step_id == 'remove_from_fridge':
+            return get_duration('preheat_oven')
+        # Remove from fridge -> Score and bake: 0 (immediate)
+        if prev_step_id == 'remove_from_fridge' and curr_step_id == 'score_and_bake':
+            return 0
+        # Score and bake -> Bake uncovered: 30 min
+        if prev_step_id == 'score_and_bake' and curr_step_id == 'bake_uncovered':
+            return get_duration('score_and_bake')
+        # Bake uncovered -> Cooling: 15 min
+        if prev_step_id == 'bake_uncovered' and curr_step_id == 'cooling':
+            return get_duration('bake_uncovered')
+        # Cooling -> Ready: 60 min
+        if prev_step_id == 'cooling' and curr_step_id == 'ready':
+            return get_duration('cooling')
+        # Autolyse special case
+        if curr_step_id == 'autolyse':
+            return 0
+        # Feed starter -> Starter at peak (use peak hours from feeding ratio)
+        if prev_step_id == 'feed_starter' and curr_step_id == 'starter_at_peak':
+            return 0  # This is handled by the caller providing the correct datetime
+
+        # Default: 0 offset
+        return 0
+
     def _make_entry(self, step_id, dt, note=''):
         """Create a timeline entry dict."""
         step_def = self.STEP_DEFINITIONS[step_id]

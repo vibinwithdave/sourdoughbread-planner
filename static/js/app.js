@@ -16,10 +16,16 @@ const SPEED_RATIOS = {
     fast:    { starter: 100, water: 375, flour: 500 }
 };
 
+// Store the current timeline data (flat list) for editing
+let currentTimelineFlat = [];
+let currentSettings = {};
+let currentIngredients = {};
+
 document.addEventListener('DOMContentLoaded', function () {
     initializeForm();
     attachEventListeners();
     updateRecipePreview();
+    loadSavedSchedules();
 });
 
 // --- Initialization ---
@@ -69,6 +75,10 @@ function attachEventListeners() {
     // Starter maintenance inputs
     document.getElementById('existing_starter_amount').addEventListener('input', updateStarterPreview);
     document.getElementById('feeding_ratio').addEventListener('change', updateStarterPreview);
+
+    // Save and Export buttons
+    document.getElementById('saveScheduleBtn').addEventListener('click', saveSchedule);
+    document.getElementById('exportScheduleBtn').addEventListener('click', exportSchedule);
 }
 
 // --- Speed Mode Handling ---
@@ -207,6 +217,10 @@ async function handleFormSubmit(e) {
         const result = await response.json();
 
         if (result.success) {
+            currentSettings = result.settings;
+            currentIngredients = result.ingredients;
+            // Flatten the timeline for editing
+            currentTimelineFlat = flattenTimeline(result.timeline);
             displayResults(result);
         } else {
             alert('Error: ' + result.error);
@@ -353,6 +367,8 @@ function renderTimeline(days, settings) {
     `;
 
     let html = '';
+    let globalIndex = 0;
+
     days.forEach(day => {
         html += `<div class="timeline-day">`;
         html += `<div class="timeline-day-header">${day.date}</div>`;
@@ -360,25 +376,333 @@ function renderTimeline(days, settings) {
 
         day.steps.forEach(step => {
             html += `
-                <div class="timeline-step" data-category="${step.category}">
+                <div class="timeline-step" data-category="${step.category}" data-step-index="${globalIndex}" data-step-id="${step.step_id}">
                     <div class="step-header">
                         <span class="step-name">${step.name}</span>
-                        <span class="step-time">${step.time_display}</span>
+                        <span class="step-time editable-time" data-index="${globalIndex}" title="Click to edit time">${step.time_display}</span>
                     </div>
                     <div class="step-description">${step.description}</div>
                     <div class="step-visual-cue">${step.visual_cue}</div>
                     ${step.note ? `<div class="step-note">${step.note}</div>` : ''}
                 </div>
             `;
+            globalIndex++;
         });
 
         html += `</div></div>`;
     });
 
     document.getElementById('timelineVisual').innerHTML = html;
+
+    // Attach click handlers for editable times
+    document.querySelectorAll('.editable-time').forEach(el => {
+        el.addEventListener('click', handleTimeClick);
+    });
 }
 
-// --- Utilities ---
+// --- Inline Time Editing ---
+
+function handleTimeClick(e) {
+    const timeEl = e.target;
+    const stepIndex = parseInt(timeEl.dataset.index);
+    const step = currentTimelineFlat[stepIndex];
+
+    if (!step) return;
+
+    // Create an inline time input
+    const currentDt = new Date(step.datetime);
+    const timeValue = formatForInput(currentDt);
+    const dateValue = formatDateForInput(currentDt);
+
+    const editContainer = document.createElement('div');
+    editContainer.className = 'time-edit-container';
+    editContainer.innerHTML = `
+        <input type="date" class="time-edit-date" value="${dateValue}">
+        <input type="time" class="time-edit-input" value="${timeValue}">
+        <button class="time-edit-confirm" title="Apply">&#10003;</button>
+        <button class="time-edit-cancel" title="Cancel">&#10005;</button>
+    `;
+
+    // Replace the time display with the edit controls
+    timeEl.style.display = 'none';
+    timeEl.parentNode.appendChild(editContainer);
+
+    // Focus the time input
+    editContainer.querySelector('.time-edit-input').focus();
+
+    // Handle confirm
+    editContainer.querySelector('.time-edit-confirm').addEventListener('click', async () => {
+        const newDate = editContainer.querySelector('.time-edit-date').value;
+        const newTime = editContainer.querySelector('.time-edit-input').value;
+        if (newDate && newTime) {
+            const newDatetime = `${newDate}T${newTime}:00`;
+            await recalculateFromStep(stepIndex, newDatetime);
+        }
+        editContainer.remove();
+        timeEl.style.display = '';
+    });
+
+    // Handle cancel
+    editContainer.querySelector('.time-edit-cancel').addEventListener('click', () => {
+        editContainer.remove();
+        timeEl.style.display = '';
+    });
+
+    // Handle Enter key
+    editContainer.querySelectorAll('input').forEach(input => {
+        input.addEventListener('keydown', async (e) => {
+            if (e.key === 'Enter') {
+                const newDate = editContainer.querySelector('.time-edit-date').value;
+                const newTime = editContainer.querySelector('.time-edit-input').value;
+                if (newDate && newTime) {
+                    const newDatetime = `${newDate}T${newTime}:00`;
+                    await recalculateFromStep(stepIndex, newDatetime);
+                }
+                editContainer.remove();
+                timeEl.style.display = '';
+            } else if (e.key === 'Escape') {
+                editContainer.remove();
+                timeEl.style.display = '';
+            }
+        });
+    });
+}
+
+async function recalculateFromStep(stepIndex, newDatetime) {
+    try {
+        const response = await fetch('/api/recalculate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                timeline: currentTimelineFlat,
+                edited_step_index: stepIndex,
+                new_datetime: newDatetime,
+                temperature_f: currentSettings.temperature_f || 70,
+                cold_proof_hours: currentSettings.cold_proof_hours || 24
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            currentTimelineFlat = flattenTimeline(result.timeline);
+            renderTimeline(result.timeline, currentSettings);
+        } else {
+            alert('Error recalculating: ' + result.error);
+        }
+    } catch (error) {
+        console.error('Recalculation error:', error);
+        alert('Error recalculating timeline: ' + error.message);
+    }
+}
+
+// --- Save Schedule ---
+
+function saveSchedule() {
+    if (currentTimelineFlat.length === 0) {
+        alert('No schedule to save. Generate a baking schedule first.');
+        return;
+    }
+
+    const name = prompt('Name this schedule:', `Bake - ${new Date().toLocaleDateString()}`);
+    if (!name) return;
+
+    const schedule = {
+        id: Date.now(),
+        name: name,
+        savedAt: new Date().toISOString(),
+        settings: currentSettings,
+        ingredients: currentIngredients,
+        timeline: currentTimelineFlat
+    };
+
+    // Get existing saved schedules
+    const saved = JSON.parse(localStorage.getItem('sourdough_schedules') || '[]');
+    saved.unshift(schedule);
+
+    // Keep max 20 schedules
+    if (saved.length > 20) saved.pop();
+
+    localStorage.setItem('sourdough_schedules', JSON.stringify(saved));
+
+    loadSavedSchedules();
+    alert(`Schedule "${name}" saved!`);
+}
+
+function loadSavedSchedules() {
+    const saved = JSON.parse(localStorage.getItem('sourdough_schedules') || '[]');
+    const section = document.getElementById('savedSchedulesSection');
+    const list = document.getElementById('savedSchedulesList');
+
+    if (saved.length === 0) {
+        section.style.display = 'none';
+        return;
+    }
+
+    section.style.display = 'block';
+    let html = '';
+
+    saved.forEach((schedule, index) => {
+        const savedDate = new Date(schedule.savedAt).toLocaleString();
+        const firstStep = schedule.timeline[0];
+        const lastStep = schedule.timeline[schedule.timeline.length - 1];
+
+        html += `
+            <div class="saved-schedule-card">
+                <div class="saved-schedule-header">
+                    <strong>${schedule.name}</strong>
+                    <span class="saved-date">${savedDate}</span>
+                </div>
+                <div class="saved-schedule-info">
+                    ${schedule.settings.fermentation_speed || ''} speed &middot;
+                    ${schedule.settings.temperature_f || ''}°F &middot;
+                    ${schedule.settings.cold_proof_hours || ''}h cold proof
+                </div>
+                <div class="saved-schedule-actions">
+                    <button class="action-btn-sm" onclick="loadSchedule(${index})">Load</button>
+                    <button class="action-btn-sm delete-btn" onclick="deleteSchedule(${index})">Delete</button>
+                </div>
+            </div>
+        `;
+    });
+
+    list.innerHTML = html;
+}
+
+function loadSchedule(index) {
+    const saved = JSON.parse(localStorage.getItem('sourdough_schedules') || '[]');
+    const schedule = saved[index];
+    if (!schedule) return;
+
+    currentSettings = schedule.settings;
+    currentIngredients = schedule.ingredients;
+    currentTimelineFlat = schedule.timeline;
+
+    // Re-group timeline by day for rendering
+    const grouped = groupTimelineByDay(currentTimelineFlat);
+
+    const resultsDiv = document.getElementById('results');
+    resultsDiv.style.display = 'block';
+
+    renderIngredients(currentIngredients, currentSettings);
+    renderTimeline(grouped, currentSettings);
+
+    resultsDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function deleteSchedule(index) {
+    if (!confirm('Delete this saved schedule?')) return;
+
+    const saved = JSON.parse(localStorage.getItem('sourdough_schedules') || '[]');
+    saved.splice(index, 1);
+    localStorage.setItem('sourdough_schedules', JSON.stringify(saved));
+    loadSavedSchedules();
+}
+
+// --- Export Schedule ---
+
+function exportSchedule() {
+    if (currentTimelineFlat.length === 0) {
+        alert('No schedule to export. Generate a baking schedule first.');
+        return;
+    }
+
+    let text = '=== SOURDOUGH BAKING SCHEDULE ===\n\n';
+
+    // Add settings
+    text += `Speed: ${currentSettings.fermentation_speed}\n`;
+    text += `Kitchen Temp: ${currentSettings.temperature_f}°F\n`;
+    text += `Bulk Fermentation: ~${currentSettings.bulk_fermentation_estimate}h\n`;
+    text += `Cold Proof: ${currentSettings.cold_proof_hours}h\n`;
+    text += `Hydration: ${currentSettings.hydration}%\n\n`;
+
+    // Add ingredients
+    text += '--- INGREDIENTS ---\n\n';
+    if (currentIngredients.starter_feeding) {
+        const f = currentIngredients.starter_feeding;
+        text += `Starter Feeding:\n`;
+        text += `  Existing starter: ${f.existing_starter_used}g\n`;
+        text += `  + Flour: ${f.flour_to_add}g\n`;
+        text += `  + Water: ${f.water_to_add}g\n`;
+        text += `  = Total: ${f.total_after_feeding}g\n\n`;
+    }
+    text += `Main Dough:\n`;
+    text += `  Starter: ${currentIngredients.starter_amount}g\n`;
+    text += `  Flour: ${currentIngredients.additional_flour}g\n`;
+    text += `  Water: ${currentIngredients.additional_water}g\n`;
+    text += `  Salt: ${currentIngredients.salt}g\n`;
+    text += `  Total Dough: ${currentIngredients.total_dough_weight}g\n\n`;
+
+    // Add timeline
+    text += '--- TIMELINE ---\n\n';
+
+    const grouped = groupTimelineByDay(currentTimelineFlat);
+    grouped.forEach(day => {
+        text += `${day.date}\n`;
+        text += '-'.repeat(day.date.length) + '\n';
+        day.steps.forEach(step => {
+            text += `  ${step.time_display.padEnd(10)} ${step.name}\n`;
+            if (step.note) {
+                text += `               ${step.note}\n`;
+            }
+        });
+        text += '\n';
+    });
+
+    // Download as file
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `sourdough-schedule-${new Date().toISOString().slice(0, 10)}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+// --- Utility Functions ---
+
+function flattenTimeline(days) {
+    const flat = [];
+    days.forEach(day => {
+        day.steps.forEach(step => {
+            flat.push({ ...step });
+        });
+    });
+    return flat;
+}
+
+function groupTimelineByDay(flatTimeline) {
+    const days = {};
+    flatTimeline.forEach(entry => {
+        const dt = new Date(entry.datetime);
+        const dateKey = entry.date_display || dt.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+        if (!days[dateKey]) {
+            days[dateKey] = {
+                date: dateKey,
+                date_sort: dt.toISOString().slice(0, 10),
+                steps: []
+            };
+        }
+        days[dateKey].steps.push(entry);
+    });
+
+    return Object.values(days).sort((a, b) => a.date_sort.localeCompare(b.date_sort));
+}
+
+function formatForInput(dt) {
+    const hours = String(dt.getHours()).padStart(2, '0');
+    const minutes = String(dt.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+}
+
+function formatDateForInput(dt) {
+    const year = dt.getFullYear();
+    const month = String(dt.getMonth() + 1).padStart(2, '0');
+    const day = String(dt.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
 
 function roundTo(num, decimals) {
     const factor = Math.pow(10, decimals);

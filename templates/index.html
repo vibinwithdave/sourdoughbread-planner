@@ -232,9 +232,26 @@
 
             <!-- Timeline Panel -->
             <section class="results-section">
-                <h2>Baking Timeline</h2>
+                <div class="timeline-header-row">
+                    <h2>Baking Timeline</h2>
+                    <div class="timeline-actions">
+                        <button type="button" class="action-btn save-btn" id="saveScheduleBtn" title="Save to browser">
+                            <span class="btn-icon">&#128190;</span> Save
+                        </button>
+                        <button type="button" class="action-btn export-btn" id="exportScheduleBtn" title="Download as text file">
+                            <span class="btn-icon">&#128196;</span> Export
+                        </button>
+                    </div>
+                </div>
+                <p class="timeline-edit-hint">Click any time to edit it. Subsequent steps will recalculate automatically.</p>
                 <div class="timeline-info" id="timelineInfo"></div>
                 <div class="timeline-visual" id="timelineVisual"></div>
+            </section>
+
+            <!-- Saved Schedules -->
+            <section class="results-section" id="savedSchedulesSection" style="display: none;">
+                <h2>Saved Schedules</h2>
+                <div id="savedSchedulesList"></div>
             </section>
         </div>
     </div>
