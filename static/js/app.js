@@ -1,11 +1,13 @@
 /**
  * Sourdough Bread Planner - Frontend Application
- * Handles form interaction, API calls, and results rendering.
+ * Starter-amount-driven: user sets starter (g), starter %, hydration %, salt %
+ * and flour/water/salt are dynamically calculated and shown live.
  */
 
 document.addEventListener('DOMContentLoaded', function () {
     initializeForm();
     attachEventListeners();
+    updateRecipePreview(); // Show calculated values immediately
 });
 
 // --- Initialization ---
@@ -34,14 +36,57 @@ function attachEventListeners() {
     // Form submission
     document.getElementById('scheduleForm').addEventListener('submit', handleFormSubmit);
 
+    // Recipe parameter inputs -> update live preview
+    const recipeInputs = ['starter_amount', 'starter_percent', 'hydration', 'salt_percent'];
+    recipeInputs.forEach(id => {
+        document.getElementById(id).addEventListener('input', updateRecipePreview);
+    });
+
     // Temperature change -> update bulk estimate
     document.getElementById('temperature_f').addEventListener('input', updateBulkEstimate);
 
-    // Starter-related inputs -> update preview
+    // Starter maintenance inputs -> update starter preview
     document.getElementById('existing_starter_amount').addEventListener('input', updateStarterPreview);
     document.getElementById('feeding_ratio').addEventListener('change', updateStarterPreview);
-    document.getElementById('total_flour_weight').addEventListener('input', updateStarterPreview);
-    document.getElementById('starter_percent').addEventListener('input', updateStarterPreview);
+    // Also update starter preview when starter_amount changes (since that's what's needed for recipe)
+    document.getElementById('starter_amount').addEventListener('input', updateStarterPreview);
+}
+
+// --- Live Recipe Preview ---
+
+function updateRecipePreview() {
+    const starterAmount = parseFloat(document.getElementById('starter_amount').value) || 100;
+    const starterPercent = parseFloat(document.getElementById('starter_percent').value) || 20;
+    const hydration = parseFloat(document.getElementById('hydration').value) || 75;
+    const saltPercent = parseFloat(document.getElementById('salt_percent').value) || 2.2;
+
+    if (starterPercent <= 0) return;
+
+    // Calculate locally for instant feedback
+    const totalFlour = starterAmount / (starterPercent / 100);
+    const totalWater = totalFlour * (hydration / 100);
+    const salt = totalFlour * (saltPercent / 100);
+
+    // Starter is 100% hydration: half flour, half water
+    const starterFlourContribution = starterAmount / 2;
+    const starterWaterContribution = starterAmount / 2;
+    const additionalFlour = totalFlour - starterFlourContribution;
+    const additionalWater = totalWater - starterWaterContribution;
+
+    const totalDough = totalFlour + totalWater + salt + starterAmount;
+
+    // Update preview display
+    document.getElementById('previewFlour').textContent = `${Math.round(totalFlour)}g`;
+    document.getElementById('previewWater').textContent = `${Math.round(totalWater)}g`;
+    document.getElementById('previewSalt').textContent = `${roundTo(salt, 1)}g`;
+    document.getElementById('previewStarter').textContent = `${Math.round(starterAmount)}g`;
+    document.getElementById('previewTotal').textContent = `${Math.round(totalDough)}g`;
+
+    // Update breakdown
+    document.getElementById('previewAddFlour').textContent = Math.round(additionalFlour);
+    document.getElementById('previewAddWater').textContent = Math.round(additionalWater);
+    document.getElementById('previewAddStarter').textContent = Math.round(starterAmount);
+    document.getElementById('previewAddSalt').textContent = roundTo(salt, 1);
 }
 
 // --- Live Updates ---
@@ -53,7 +98,6 @@ function updateBulkEstimate() {
 }
 
 function estimateBulkHours(tempF) {
-    // Client-side estimation matching the backend logic
     const data = [
         [65, 12.0], [68, 10.0], [70, 9.0], [72, 8.0],
         [75, 7.0], [78, 6.0], [80, 5.0], [82, 4.5], [85, 4.0]
@@ -75,8 +119,7 @@ function estimateBulkHours(tempF) {
 function updateStarterPreview() {
     const existingStarter = parseFloat(document.getElementById('existing_starter_amount').value) || 50;
     const ratio = document.getElementById('feeding_ratio').value;
-    const totalFlour = parseFloat(document.getElementById('total_flour_weight').value) || 500;
-    const starterPercent = parseFloat(document.getElementById('starter_percent').value) || 20;
+    const starterAmount = parseFloat(document.getElementById('starter_amount').value) || 100;
 
     // Parse ratio
     const parts = ratio.split(':').map(Number);
@@ -84,16 +127,15 @@ function updateStarterPreview() {
     const waterParts = parts[2];
 
     const totalAfterFeeding = existingStarter + (existingStarter * flourParts) + (existingStarter * waterParts);
-    const starterNeeded = totalFlour * (starterPercent / 100);
-    const remaining = Math.max(0, totalAfterFeeding - starterNeeded);
+    const remaining = Math.max(0, totalAfterFeeding - starterAmount);
 
     let statusText = '';
-    if (totalAfterFeeding >= starterNeeded) {
+    if (totalAfterFeeding >= starterAmount) {
         statusText = `Feeding ${existingStarter}g at ${ratio} produces ${Math.round(totalAfterFeeding)}g. ` +
-            `Recipe needs ${Math.round(starterNeeded)}g, leaving ${Math.round(remaining)}g for future bakes.`;
+            `Recipe needs ${Math.round(starterAmount)}g, leaving ${Math.round(remaining)}g for future bakes.`;
     } else {
         statusText = `Warning: Feeding ${existingStarter}g at ${ratio} only produces ${Math.round(totalAfterFeeding)}g, ` +
-            `but recipe needs ${Math.round(starterNeeded)}g. Increase starter amount or change ratio.`;
+            `but recipe needs ${Math.round(starterAmount)}g. Increase existing starter amount or change ratio.`;
     }
 
     document.getElementById('starterPreview').textContent = statusText;
@@ -138,8 +180,6 @@ async function handleFormSubmit(e) {
 }
 
 function collectFormData() {
-    const form = document.getElementById('scheduleForm');
-
     // Collect enabled steps
     const enabledSteps = {
         'autolyse': document.getElementById('step_autolyse').checked,
@@ -153,10 +193,10 @@ function collectFormData() {
     };
 
     return {
-        total_flour_weight: parseFloat(document.getElementById('total_flour_weight').value),
+        starter_amount: parseFloat(document.getElementById('starter_amount').value),
+        starter_percent: parseFloat(document.getElementById('starter_percent').value),
         hydration: parseFloat(document.getElementById('hydration').value),
         salt_percent: parseFloat(document.getElementById('salt_percent').value),
-        starter_percent: parseFloat(document.getElementById('starter_percent').value),
         existing_starter_amount: parseFloat(document.getElementById('existing_starter_amount').value),
         feeding_ratio: document.getElementById('feeding_ratio').value,
         start_time: document.getElementById('start_time').value,
@@ -211,7 +251,7 @@ function renderIngredients(ingredients, settings) {
         <div class="starter-status ${feeding.sufficient ? 'sufficient' : 'insufficient'}">
             ${feeding.sufficient
                 ? 'Feeding produces enough starter for the recipe'
-                : 'Insufficient! Increase starter amount or change ratio'}
+                : 'Insufficient! Increase existing starter amount or change ratio'}
         </div>
     `;
 
@@ -219,7 +259,7 @@ function renderIngredients(ingredients, settings) {
     document.getElementById('mainDoughResults').innerHTML = `
         <div class="ingredient-row">
             <span class="label">Active Starter</span>
-            <span class="value">${ingredients.starter_for_recipe}g</span>
+            <span class="value">${ingredients.starter_amount}g</span>
         </div>
         <div class="ingredient-row">
             <span class="label">${settings.flour_type}</span>
@@ -259,7 +299,7 @@ function renderIngredients(ingredients, settings) {
 function renderTimeline(days, settings) {
     // Timeline info badges
     document.getElementById('timelineInfo').innerHTML = `
-        <span class="timeline-badge"><strong>${settings.temperature_f}°F</strong> kitchen</span>
+        <span class="timeline-badge"><strong>${settings.temperature_f}&deg;F</strong> kitchen</span>
         <span class="timeline-badge"><strong>~${settings.bulk_fermentation_estimate}h</strong> bulk ferment</span>
         <span class="timeline-badge"><strong>${settings.cold_proof_hours}h</strong> cold proof</span>
         <span class="timeline-badge"><strong>${settings.hydration}%</strong> hydration</span>
@@ -291,4 +331,11 @@ function renderTimeline(days, settings) {
     });
 
     document.getElementById('timelineVisual').innerHTML = html;
+}
+
+// --- Utilities ---
+
+function roundTo(num, decimals) {
+    const factor = Math.pow(10, decimals);
+    return Math.round(num * factor) / factor;
 }

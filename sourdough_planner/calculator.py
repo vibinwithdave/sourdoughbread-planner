@@ -1,14 +1,17 @@
 """
 Ingredient calculator for sourdough bread planning.
 
-Uses a starter-centric calculation model where flour, water, and salt
-amounts are derived from the starter parameters, while also allowing
-users to specify a desired total flour weight for scaling.
+Uses a starter-amount-driven calculation model:
+  - User inputs: starter amount (g), starter %, hydration %, salt %
+  - Derived: total flour weight, total water, salt weight
+
+The starter amount determines the scale of the entire recipe.
+For example: 100g starter at 20% starter means total flour = 100 / 0.20 = 500g.
 """
 
 
 class IngredientCalculator:
-    """Calculate ingredient amounts based on starter parameters and desired flour weight."""
+    """Calculate ingredient amounts driven by the starter amount and baker's percentages."""
 
     # Feeding ratio definitions with peak time estimates
     FEEDING_RATIOS = {
@@ -56,10 +59,11 @@ class IngredientCalculator:
         }
     }
 
-    # Default baker's percentages (relative to total flour weight)
-    DEFAULT_HYDRATION = 75  # 75% hydration
-    DEFAULT_SALT_PERCENT = 2.2  # 2.2% salt (approx 11g per 500g flour)
-    DEFAULT_STARTER_PERCENT = 20  # 20% starter (100g per 500g flour)
+    # Default baker's percentages
+    DEFAULT_HYDRATION = 75
+    DEFAULT_SALT_PERCENT = 2.2
+    DEFAULT_STARTER_PERCENT = 20
+    DEFAULT_STARTER_AMOUNT = 100  # grams
 
     def __init__(self):
         pass
@@ -67,6 +71,68 @@ class IngredientCalculator:
     def get_feeding_ratios(self):
         """Return available feeding ratios for frontend display."""
         return {k: v['description'] for k, v in self.FEEDING_RATIOS.items()}
+
+    def derive_flour_weight(self, starter_amount, starter_percent):
+        """
+        Derive the total flour weight from the starter amount and starter percentage.
+
+        Formula: total_flour = starter_amount / (starter_percent / 100)
+
+        Args:
+            starter_amount: Grams of active starter to use in the recipe
+            starter_percent: Starter as percentage of total flour (e.g., 20)
+
+        Returns:
+            Total flour weight in grams
+        """
+        if starter_percent <= 0:
+            raise ValueError("Starter percentage must be greater than 0")
+        return starter_amount / (starter_percent / 100)
+
+    def derive_recipe_from_starter(self, starter_amount, starter_percent, hydration, salt_percent):
+        """
+        Derive all recipe weights from the starter amount and baker's percentages.
+
+        This is the core calculation used for the live preview in the UI.
+
+        Args:
+            starter_amount: Grams of active starter (e.g., 100)
+            starter_percent: Starter as % of total flour (e.g., 20)
+            hydration: Water as % of total flour (e.g., 75)
+            salt_percent: Salt as % of total flour (e.g., 2.2)
+
+        Returns:
+            dict with total_flour, total_water, salt, and total_dough_weight
+        """
+        if starter_percent <= 0:
+            raise ValueError("Starter percentage must be greater than 0")
+
+        total_flour = starter_amount / (starter_percent / 100)
+        total_water = total_flour * (hydration / 100)
+        salt = total_flour * (salt_percent / 100)
+
+        # Starter contributes flour and water (assumes 100% hydration starter)
+        starter_flour_contribution = starter_amount / 2
+        starter_water_contribution = starter_amount / 2
+
+        # Additional flour and water needed beyond what starter provides
+        additional_flour = total_flour - starter_flour_contribution
+        additional_water = total_water - starter_water_contribution
+
+        total_dough_weight = total_flour + total_water + salt + starter_amount
+
+        return {
+            'starter_amount': round(starter_amount, 1),
+            'starter_percent': starter_percent,
+            'total_flour': round(total_flour, 1),
+            'total_water': round(total_water, 1),
+            'additional_flour': round(additional_flour, 1),
+            'additional_water': round(additional_water, 1),
+            'salt': round(salt, 1),
+            'hydration': hydration,
+            'salt_percent': salt_percent,
+            'total_dough_weight': round(total_dough_weight, 1)
+        }
 
     def calculate_starter_feeding(self, existing_starter_amount, feeding_ratio, starter_needed_for_recipe):
         """
@@ -102,65 +168,46 @@ class IngredientCalculator:
             'sufficient': total_after_feeding >= starter_needed_for_recipe
         }
 
-    def calculate_ingredients(self, total_flour_weight, hydration, salt_percent,
-                              starter_percent, existing_starter_amount, feeding_ratio):
+    def calculate_ingredients(self, starter_amount, starter_percent, hydration,
+                              salt_percent, existing_starter_amount, feeding_ratio):
         """
-        Calculate all ingredient amounts using a starter-centric model
-        with user-specified total flour weight.
+        Calculate all ingredient amounts driven by the starter amount.
 
-        The starter contributes both flour and water to the total dough.
-        Additional flour and water are calculated to meet the target
-        total flour weight and hydration percentage.
+        The starter amount and starter % determine the total flour weight.
+        Hydration % and salt % then determine water and salt.
 
         Args:
-            total_flour_weight: Desired total flour in the final dough (grams)
-            hydration: Target hydration percentage (e.g., 75 for 75%)
-            salt_percent: Salt as percentage of total flour (e.g., 2.2)
+            starter_amount: Grams of active starter to use in recipe (e.g., 100)
             starter_percent: Starter as percentage of total flour (e.g., 20)
+            hydration: Target hydration percentage (e.g., 75)
+            salt_percent: Salt as percentage of total flour (e.g., 2.2)
             existing_starter_amount: Grams of existing starter to feed
             feeding_ratio: String like '1:4:4'
 
         Returns:
             dict with all ingredient amounts and feeding info
         """
-        # Calculate starter amount needed for recipe
-        starter_for_recipe = total_flour_weight * (starter_percent / 100)
+        # Derive recipe from starter amount
+        recipe = self.derive_recipe_from_starter(
+            starter_amount, starter_percent, hydration, salt_percent
+        )
 
         # Calculate starter feeding
         starter_feeding = self.calculate_starter_feeding(
-            existing_starter_amount, feeding_ratio, starter_for_recipe
+            existing_starter_amount, feeding_ratio, starter_amount
         )
 
-        # Starter is typically 100% hydration (equal parts flour and water)
-        # So starter contributes half its weight as flour and half as water
-        starter_flour_contribution = starter_for_recipe / 2
-        starter_water_contribution = starter_for_recipe / 2
-
-        # Calculate additional flour and water needed
-        additional_flour = total_flour_weight - starter_flour_contribution
-        total_water_needed = total_flour_weight * (hydration / 100)
-        additional_water = total_water_needed - starter_water_contribution
-
-        # Salt calculation
-        salt = total_flour_weight * (salt_percent / 100)
-
-        # Total dough weight
-        total_dough_weight = total_flour_weight + total_water_needed + salt + starter_for_recipe
-
-        # Actual final hydration (accounting for starter contribution)
-        actual_hydration = (total_water_needed / total_flour_weight) * 100
-
         return {
-            'total_flour_weight': round(total_flour_weight, 1),
-            'starter_for_recipe': round(starter_for_recipe, 1),
-            'additional_flour': round(additional_flour, 1),
-            'additional_water': round(additional_water, 1),
-            'salt': round(salt, 1),
-            'total_water': round(total_water_needed, 1),
-            'total_dough_weight': round(total_dough_weight, 1),
-            'actual_hydration': round(actual_hydration, 1),
-            'starter_feeding': starter_feeding,
-            'starter_percent': starter_percent,
-            'hydration_percent': hydration,
-            'salt_percent': salt_percent
+            'starter_amount': recipe['starter_amount'],
+            'starter_percent': recipe['starter_percent'],
+            'total_flour_weight': recipe['total_flour'],
+            'additional_flour': recipe['additional_flour'],
+            'total_water': recipe['total_water'],
+            'additional_water': recipe['additional_water'],
+            'salt': recipe['salt'],
+            'hydration_percent': recipe['hydration'],
+            'salt_percent': recipe['salt_percent'],
+            'total_dough_weight': recipe['total_dough_weight'],
+            'actual_hydration': recipe['hydration'],
+            'starter_feeding': starter_feeding
         }

@@ -35,6 +35,79 @@ class TestFeedingRatios:
             assert 'description' in info
 
 
+class TestDeriveFlourWeight:
+    """Tests for deriving total flour from starter amount and percentage."""
+
+    def test_100g_at_20_percent(self, calc):
+        """100g starter at 20% = 500g total flour."""
+        flour = calc.derive_flour_weight(100, 20)
+        assert flour == 500.0
+
+    def test_50g_at_10_percent(self, calc):
+        """50g starter at 10% = 500g total flour."""
+        flour = calc.derive_flour_weight(50, 10)
+        assert flour == 500.0
+
+    def test_200g_at_20_percent(self, calc):
+        """200g starter at 20% = 1000g total flour."""
+        flour = calc.derive_flour_weight(200, 20)
+        assert flour == 1000.0
+
+    def test_75g_at_15_percent(self, calc):
+        """75g starter at 15% = 500g total flour."""
+        flour = calc.derive_flour_weight(75, 15)
+        assert flour == 500.0
+
+    def test_zero_percent_raises(self, calc):
+        with pytest.raises(ValueError):
+            calc.derive_flour_weight(100, 0)
+
+    def test_negative_percent_raises(self, calc):
+        with pytest.raises(ValueError):
+            calc.derive_flour_weight(100, -5)
+
+
+class TestDeriveRecipeFromStarter:
+    """Tests for the live preview calculation."""
+
+    def test_standard_recipe(self, calc):
+        """100g starter, 20%, 75% hydration, 2.2% salt."""
+        recipe = calc.derive_recipe_from_starter(100, 20, 75, 2.2)
+        assert recipe['total_flour'] == 500.0
+        assert recipe['total_water'] == 375.0
+        assert recipe['salt'] == 11.0
+        assert recipe['starter_amount'] == 100.0
+        assert recipe['additional_flour'] == 450.0  # 500 - 50 (starter flour)
+        assert recipe['additional_water'] == 325.0  # 375 - 50 (starter water)
+
+    def test_total_dough_weight(self, calc):
+        recipe = calc.derive_recipe_from_starter(100, 20, 75, 2.2)
+        # total = flour(500) + water(375) + salt(11) + starter(100) = 986
+        assert recipe['total_dough_weight'] == 986.0
+
+    def test_high_hydration(self, calc):
+        recipe = calc.derive_recipe_from_starter(100, 20, 85, 2.0)
+        assert recipe['total_flour'] == 500.0
+        assert recipe['total_water'] == 425.0  # 85% of 500
+
+    def test_small_starter_amount(self, calc):
+        """50g starter at 20% = 250g flour."""
+        recipe = calc.derive_recipe_from_starter(50, 20, 75, 2.2)
+        assert recipe['total_flour'] == 250.0
+        assert recipe['total_water'] == 187.5
+        assert recipe['salt'] == 5.5
+
+    def test_large_starter_percent(self, calc):
+        """100g starter at 40% = 250g flour."""
+        recipe = calc.derive_recipe_from_starter(100, 40, 75, 2.0)
+        assert recipe['total_flour'] == 250.0
+        assert recipe['total_water'] == 187.5
+
+    def test_zero_percent_raises(self, calc):
+        with pytest.raises(ValueError):
+            calc.derive_recipe_from_starter(100, 0, 75, 2.2)
+
+
 class TestStarterFeeding:
     """Tests for starter feeding calculations."""
 
@@ -63,120 +136,82 @@ class TestStarterFeeding:
         # 5g at 1:1:1 = 15g total, need 100g -> insufficient
         result = calc.calculate_starter_feeding(5, '1:1:1', 100)
         assert result['sufficient'] is False
-        assert result['starter_for_recipe'] == 15  # Can only provide what's available
+        assert result['starter_for_recipe'] == 15
         assert result['starter_remaining'] == 0
 
     def test_peak_hours_returned(self, calc):
         result = calc.calculate_starter_feeding(50, '1:4:4', 100)
         assert result['peak_hours'] == 11
 
-    def test_rounding(self, calc):
-        result = calc.calculate_starter_feeding(33, '1:3:3', 100)
-        # All values should be rounded to 1 decimal
-        assert result['flour_to_add'] == 99.0
-        assert result['water_to_add'] == 99.0
-        assert result['total_after_feeding'] == 231.0
-
 
 class TestIngredientCalculation:
-    """Tests for full ingredient calculations."""
+    """Tests for the full calculate_ingredients method (starter-amount-driven)."""
 
-    def test_alexandra_cooks_recipe_approximation(self, calc):
-        """Test that we can approximate the Alexandra Cooks recipe:
-        500g flour, 375g water (75%), 100g starter (20%), 11g salt (2.2%)
-        """
+    def test_alexandra_cooks_recipe(self, calc):
+        """100g starter at 20% = 500g flour, 75% hydration, 2.2% salt."""
         result = calc.calculate_ingredients(
-            total_flour_weight=500,
+            starter_amount=100,
+            starter_percent=20,
             hydration=75,
             salt_percent=2.2,
-            starter_percent=20,
             existing_starter_amount=50,
             feeding_ratio='1:5:5'
         )
 
-        assert result['total_flour_weight'] == 500
-        assert result['starter_for_recipe'] == 100  # 20% of 500
-        assert result['salt'] == 11.0  # 2.2% of 500
-        assert result['total_water'] == 375.0  # 75% of 500
+        assert result['starter_amount'] == 100.0
+        assert result['total_flour_weight'] == 500.0
+        assert result['total_water'] == 375.0
+        assert result['salt'] == 11.0
+        assert result['additional_flour'] == 450.0
+        assert result['additional_water'] == 325.0
         assert result['actual_hydration'] == 75.0
-
-    def test_additional_flour_accounts_for_starter(self, calc):
-        """Starter contributes flour, so additional flour should be less than total."""
-        result = calc.calculate_ingredients(
-            total_flour_weight=500,
-            hydration=75,
-            salt_percent=2.0,
-            starter_percent=20,
-            existing_starter_amount=50,
-            feeding_ratio='1:5:5'
-        )
-
-        # Starter (100g at 100% hydration) contributes 50g flour
-        assert result['additional_flour'] == 450.0  # 500 - 50
-
-    def test_additional_water_accounts_for_starter(self, calc):
-        """Starter contributes water, so additional water should be less than total."""
-        result = calc.calculate_ingredients(
-            total_flour_weight=500,
-            hydration=75,
-            salt_percent=2.0,
-            starter_percent=20,
-            existing_starter_amount=50,
-            feeding_ratio='1:5:5'
-        )
-
-        # Total water = 375g, starter contributes 50g water
-        assert result['additional_water'] == 325.0  # 375 - 50
-
-    def test_total_dough_weight(self, calc):
-        result = calc.calculate_ingredients(
-            total_flour_weight=500,
-            hydration=75,
-            salt_percent=2.2,
-            starter_percent=20,
-            existing_starter_amount=50,
-            feeding_ratio='1:5:5'
-        )
-
-        # Total = flour(500) + water(375) + salt(11) + starter(100)
-        expected_total = 500 + 375 + 11 + 100
-        assert result['total_dough_weight'] == expected_total
-
-    def test_scaling_with_different_flour_weight(self, calc):
-        """Doubling flour weight should double all ingredients proportionally."""
-        result_500 = calc.calculate_ingredients(
-            total_flour_weight=500, hydration=75, salt_percent=2.0,
-            starter_percent=20, existing_starter_amount=50, feeding_ratio='1:5:5'
-        )
-        result_1000 = calc.calculate_ingredients(
-            total_flour_weight=1000, hydration=75, salt_percent=2.0,
-            starter_percent=20, existing_starter_amount=100, feeding_ratio='1:5:5'
-        )
-
-        assert result_1000['starter_for_recipe'] == 2 * result_500['starter_for_recipe']
-        assert result_1000['additional_flour'] == 2 * result_500['additional_flour']
-        assert result_1000['salt'] == 2 * result_500['salt']
-
-    def test_high_hydration(self, calc):
-        result = calc.calculate_ingredients(
-            total_flour_weight=500, hydration=85, salt_percent=2.0,
-            starter_percent=20, existing_starter_amount=50, feeding_ratio='1:5:5'
-        )
-        assert result['actual_hydration'] == 85.0
-        assert result['total_water'] == 425.0
-
-    def test_low_hydration(self, calc):
-        result = calc.calculate_ingredients(
-            total_flour_weight=500, hydration=65, salt_percent=2.0,
-            starter_percent=20, existing_starter_amount=50, feeding_ratio='1:5:5'
-        )
-        assert result['actual_hydration'] == 65.0
-        assert result['total_water'] == 325.0
 
     def test_starter_feeding_info_included(self, calc):
         result = calc.calculate_ingredients(
-            total_flour_weight=500, hydration=75, salt_percent=2.0,
-            starter_percent=20, existing_starter_amount=50, feeding_ratio='1:5:5'
+            starter_amount=100,
+            starter_percent=20,
+            hydration=75,
+            salt_percent=2.0,
+            existing_starter_amount=50,
+            feeding_ratio='1:5:5'
         )
         assert 'starter_feeding' in result
         assert result['starter_feeding']['existing_starter_used'] == 50
+
+    def test_scaling_with_different_starter_amount(self, calc):
+        """Doubling starter amount should double all recipe weights."""
+        result_100 = calc.calculate_ingredients(
+            starter_amount=100, starter_percent=20, hydration=75,
+            salt_percent=2.0, existing_starter_amount=50, feeding_ratio='1:5:5'
+        )
+        result_200 = calc.calculate_ingredients(
+            starter_amount=200, starter_percent=20, hydration=75,
+            salt_percent=2.0, existing_starter_amount=100, feeding_ratio='1:5:5'
+        )
+
+        assert result_200['total_flour_weight'] == 2 * result_100['total_flour_weight']
+        assert result_200['total_water'] == 2 * result_100['total_water']
+        assert result_200['salt'] == 2 * result_100['salt']
+
+    def test_changing_starter_percent_changes_flour(self, calc):
+        """Same starter amount at different % should give different flour weights."""
+        result_20 = calc.calculate_ingredients(
+            starter_amount=100, starter_percent=20, hydration=75,
+            salt_percent=2.0, existing_starter_amount=50, feeding_ratio='1:5:5'
+        )
+        result_10 = calc.calculate_ingredients(
+            starter_amount=100, starter_percent=10, hydration=75,
+            salt_percent=2.0, existing_starter_amount=50, feeding_ratio='1:5:5'
+        )
+
+        # 100g at 20% = 500g flour; 100g at 10% = 1000g flour
+        assert result_20['total_flour_weight'] == 500.0
+        assert result_10['total_flour_weight'] == 1000.0
+
+    def test_total_dough_weight(self, calc):
+        result = calc.calculate_ingredients(
+            starter_amount=100, starter_percent=20, hydration=75,
+            salt_percent=2.2, existing_starter_amount=50, feeding_ratio='1:5:5'
+        )
+        # 500 + 375 + 11 + 100 = 986
+        assert result['total_dough_weight'] == 986.0

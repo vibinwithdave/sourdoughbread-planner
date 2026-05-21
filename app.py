@@ -3,7 +3,7 @@ Sourdough Bread Planner - Flask Application
 
 A web-based tool for generating detailed sourdough baking schedules
 with precise timing, temperature-aware fermentation estimates, and
-ingredient calculations based on baker's percentages.
+ingredient calculations driven by the starter amount.
 """
 
 from flask import Flask, render_template, request, jsonify
@@ -36,7 +36,7 @@ def index():
 @app.route('/health')
 def health_check():
     """Health check endpoint for deployment platforms."""
-    return jsonify({'status': 'healthy', 'version': '2.0.0'})
+    return jsonify({'status': 'healthy', 'version': '2.1.0'})
 
 
 @app.route('/api/ratios')
@@ -64,6 +64,32 @@ def get_steps():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@app.route('/api/preview', methods=['POST'])
+def preview_recipe():
+    """
+    Live preview endpoint: derive flour, water, salt from starter amount
+    and baker's percentages. Called on every input change in the UI.
+    """
+    try:
+        data = request.json or {}
+        starter_amount = float(data.get('starter_amount', 100))
+        starter_percent = float(data.get('starter_percent', 20))
+        hydration = float(data.get('hydration', 75))
+        salt_percent = float(data.get('salt_percent', 2.2))
+
+        recipe = calculator.derive_recipe_from_starter(
+            starter_amount=starter_amount,
+            starter_percent=starter_percent,
+            hydration=hydration,
+            salt_percent=salt_percent
+        )
+        return jsonify({'success': True, 'recipe': recipe})
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/api/estimate-bulk', methods=['POST'])
 def estimate_bulk():
     """Estimate bulk fermentation time for a given temperature."""
@@ -86,11 +112,11 @@ def generate_schedule():
     try:
         data = request.json if request.is_json else request.form.to_dict()
 
-        # Extract parameters with defaults
-        total_flour_weight = float(data.get('total_flour_weight', 500))
+        # Primary inputs: starter amount drives the recipe
+        starter_amount = float(data.get('starter_amount', 100))
+        starter_percent = float(data.get('starter_percent', 20))
         hydration = float(data.get('hydration', 75))
         salt_percent = float(data.get('salt_percent', 2.2))
-        starter_percent = float(data.get('starter_percent', 20))
         existing_starter_amount = float(data.get('existing_starter_amount', 50))
         feeding_ratio = data.get('feeding_ratio', '1:5:5')
         start_time = data.get('start_time', '8:00 PM')
@@ -119,12 +145,12 @@ def generate_schedule():
             return jsonify({'success': False,
                             'error': f'Invalid feeding ratio: {feeding_ratio}'}), 400
 
-        # Calculate ingredients
+        # Calculate ingredients (starter-amount-driven)
         ingredients = calculator.calculate_ingredients(
-            total_flour_weight=total_flour_weight,
+            starter_amount=starter_amount,
+            starter_percent=starter_percent,
             hydration=hydration,
             salt_percent=salt_percent,
-            starter_percent=starter_percent,
             existing_starter_amount=existing_starter_amount,
             feeding_ratio=feeding_ratio
         )

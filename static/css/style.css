@@ -637,3 +637,88 @@ body {
         padding-left: 20px;
     }
 }
+
+/* --- Recipe Preview Panel --- */
+.recipe-preview {
+    margin-top: 24px;
+    padding: 20px;
+    background: linear-gradient(135deg, #FFF8E1 0%, #E8F5E9 100%);
+    border: 2px solid var(--color-accent);
+    border-radius: var(--radius-md);
+    animation: fadeIn 0.3s ease;
+}
+
+.recipe-preview h3 {
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--color-primary);
+    margin-bottom: 14px;
+}
+
+.preview-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.preview-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px 8px;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.preview-item.total {
+    background: rgba(139, 69, 19, 0.08);
+    border-color: var(--color-accent);
+}
+
+.preview-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    color: var(--color-text-muted);
+    margin-bottom: 4px;
+}
+
+.preview-value {
+    font-family: var(--font-mono);
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--color-text);
+}
+
+.preview-item.total .preview-value {
+    color: var(--color-primary);
+    font-size: 1.3rem;
+}
+
+.preview-breakdown {
+    text-align: center;
+    padding-top: 12px;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    color: var(--color-text-muted);
+    font-size: 0.85rem;
+}
+
+.preview-breakdown strong {
+    color: var(--color-text);
+}
+
+/* --- Primary Input Highlight --- */
+.form-group.primary-input input {
+    border-color: var(--color-primary);
+    background: #FFFDF8;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.form-group.primary-input label {
+    color: var(--color-primary);
+    font-size: 0.9rem;
+}

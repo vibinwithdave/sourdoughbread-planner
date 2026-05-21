@@ -19,14 +19,20 @@
                 <section class="form-section">
                     <div class="section-header">
                         <h2>Recipe Parameters</h2>
-                        <p class="section-description">Set your desired dough characteristics. Flour, water, and salt are calculated based on your starter and baker's percentages.</p>
+                        <p class="section-description">Set your starter amount and baker's percentages. Flour, water, and salt weights are calculated automatically.</p>
                     </div>
 
                     <div class="form-grid">
+                        <div class="form-group primary-input">
+                            <label for="starter_amount">Starter Amount (g)</label>
+                            <input type="number" id="starter_amount" name="starter_amount" value="100" min="20" max="500" step="5">
+                            <span class="form-hint">Amount of active starter for the recipe</span>
+                        </div>
+
                         <div class="form-group">
-                            <label for="total_flour_weight">Total Flour Weight (g)</label>
-                            <input type="number" id="total_flour_weight" name="total_flour_weight" value="500" min="200" max="2000" step="10">
-                            <span class="form-hint">Standard loaf: 500g</span>
+                            <label for="starter_percent">Starter (%)</label>
+                            <input type="number" id="starter_percent" name="starter_percent" value="20" min="5" max="40" step="1">
+                            <span class="form-hint">% of total flour weight</span>
                         </div>
 
                         <div class="form-group">
@@ -42,12 +48,6 @@
                         </div>
 
                         <div class="form-group">
-                            <label for="starter_percent">Starter (%)</label>
-                            <input type="number" id="starter_percent" name="starter_percent" value="20" min="5" max="40" step="1">
-                            <span class="form-hint">20% = 100g for 500g flour</span>
-                        </div>
-
-                        <div class="form-group">
                             <label for="flour_type">Flour Type</label>
                             <select id="flour_type" name="flour_type">
                                 <option value="bread flour" selected>Bread Flour</option>
@@ -55,6 +55,36 @@
                                 <option value="whole wheat flour">Whole Wheat Flour</option>
                                 <option value="mixed flour">Mixed Flour (blend)</option>
                             </select>
+                        </div>
+                    </div>
+
+                    <!-- Live Recipe Preview -->
+                    <div class="recipe-preview" id="recipePreview">
+                        <h3>Calculated Recipe</h3>
+                        <div class="preview-grid">
+                            <div class="preview-item">
+                                <span class="preview-label">Total Flour</span>
+                                <span class="preview-value" id="previewFlour">500g</span>
+                            </div>
+                            <div class="preview-item">
+                                <span class="preview-label">Total Water</span>
+                                <span class="preview-value" id="previewWater">375g</span>
+                            </div>
+                            <div class="preview-item">
+                                <span class="preview-label">Salt</span>
+                                <span class="preview-value" id="previewSalt">11g</span>
+                            </div>
+                            <div class="preview-item">
+                                <span class="preview-label">Starter</span>
+                                <span class="preview-value" id="previewStarter">100g</span>
+                            </div>
+                            <div class="preview-item total">
+                                <span class="preview-label">Total Dough</span>
+                                <span class="preview-value" id="previewTotal">986g</span>
+                            </div>
+                        </div>
+                        <div class="preview-breakdown" id="previewBreakdown">
+                            <small>Add <strong><span id="previewAddFlour">450</span>g</strong> flour + <strong><span id="previewAddWater">325</span>g</strong> water to <strong><span id="previewAddStarter">100</span>g</strong> starter + <strong><span id="previewAddSalt">11</span>g</strong> salt</small>
                         </div>
                     </div>
                 </section>
@@ -68,9 +98,9 @@
 
                     <div class="form-grid">
                         <div class="form-group">
-                            <label for="existing_starter_amount">Existing Starter (g)</label>
+                            <label for="existing_starter_amount">Existing Starter to Feed (g)</label>
                             <input type="number" id="existing_starter_amount" name="existing_starter_amount" value="50" min="5" max="200" step="5">
-                            <span class="form-hint">Amount you'll feed from your jar</span>
+                            <span class="form-hint">Amount you'll take from your jar to feed</span>
                         </div>
 
                         <div class="form-group">
@@ -104,7 +134,7 @@
                         </div>
 
                         <div class="form-group">
-                            <label for="temperature_f">Kitchen Temperature (°F)</label>
+                            <label for="temperature_f">Kitchen Temperature (&deg;F)</label>
                             <input type="number" id="temperature_f" name="temperature_f" value="70" min="60" max="90" step="1">
                             <span class="form-hint" id="bulkEstimate">~9 hours bulk fermentation</span>
                         </div>

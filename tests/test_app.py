@@ -42,6 +42,44 @@ class TestHealthAndInfo:
         assert 'feed_starter' in data['steps']
 
 
+class TestPreviewEndpoint:
+    """Tests for the live recipe preview endpoint."""
+
+    def test_preview_standard(self, client):
+        response = client.post('/api/preview', json={
+            'starter_amount': 100,
+            'starter_percent': 20,
+            'hydration': 75,
+            'salt_percent': 2.2
+        })
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['success'] is True
+        assert data['recipe']['total_flour'] == 500.0
+        assert data['recipe']['total_water'] == 375.0
+        assert data['recipe']['salt'] == 11.0
+
+    def test_preview_with_different_starter(self, client):
+        response = client.post('/api/preview', json={
+            'starter_amount': 50,
+            'starter_percent': 10,
+            'hydration': 80,
+            'salt_percent': 2.0
+        })
+        data = response.get_json()
+        assert data['recipe']['total_flour'] == 500.0
+        assert data['recipe']['total_water'] == 400.0
+
+    def test_preview_invalid_percent(self, client):
+        response = client.post('/api/preview', json={
+            'starter_amount': 100,
+            'starter_percent': 0,
+            'hydration': 75,
+            'salt_percent': 2.0
+        })
+        assert response.status_code == 400
+
+
 class TestBulkEstimate:
     """Tests for the bulk fermentation estimate endpoint."""
 
@@ -75,10 +113,10 @@ class TestGenerateSchedule:
     def test_generate_alexandra_cooks_style(self, client):
         """Test generating a schedule matching the Alexandra Cooks recipe."""
         response = client.post('/api/generate', json={
-            'total_flour_weight': 500,
+            'starter_amount': 100,
+            'starter_percent': 20,
             'hydration': 75,
             'salt_percent': 2.2,
-            'starter_percent': 20,
             'existing_starter_amount': 50,
             'feeding_ratio': '1:5:5',
             'start_time': '8:00 PM',
@@ -102,8 +140,8 @@ class TestGenerateSchedule:
 
         # Verify ingredients match expected
         ingredients = data['ingredients']
-        assert ingredients['total_flour_weight'] == 500
-        assert ingredients['starter_for_recipe'] == 100
+        assert ingredients['total_flour_weight'] == 500.0
+        assert ingredients['starter_amount'] == 100.0
         assert ingredients['salt'] == 11.0
         assert ingredients['total_water'] == 375.0
 
@@ -115,26 +153,13 @@ class TestGenerateSchedule:
         data = response.get_json()
         assert data['success'] is False
 
-    def test_generate_with_high_hydration(self, client):
-        response = client.post('/api/generate', json={
-            'total_flour_weight': 500,
-            'hydration': 85,
-            'salt_percent': 2.0,
-            'starter_percent': 20,
-            'existing_starter_amount': 50,
-            'feeding_ratio': '1:5:5'
-        })
-        assert response.status_code == 200
-        data = response.get_json()
-        assert data['ingredients']['actual_hydration'] == 85.0
-
     def test_generate_timeline_has_days(self, client):
         response = client.post('/api/generate', json={
             'start_time': '8:00 PM',
             'cold_proof_hours': 24
         })
         data = response.get_json()
-        assert len(data['timeline']) >= 2  # Should span multiple days
+        assert len(data['timeline']) >= 2
 
     def test_generate_settings_returned(self, client):
         response = client.post('/api/generate', json={
