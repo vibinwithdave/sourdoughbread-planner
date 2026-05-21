@@ -73,7 +73,7 @@ def preview_recipe():
     try:
         data = request.json or {}
         starter_amount = float(data.get('starter_amount', 100))
-        speed = data.get('fermentation_speed', 'regular')
+        speed = data.get('fermentation_speed', 'fast')
         salt_percent = float(data.get('salt_percent', 2.2))
 
         if speed and speed != 'custom' and speed in calculator.SPEED_RATIOS:
@@ -122,7 +122,7 @@ def generate_schedule():
 
         # Primary inputs: starter amount + speed drives the recipe
         starter_amount = float(data.get('starter_amount', 100))
-        speed = data.get('fermentation_speed', 'regular')
+        speed = data.get('fermentation_speed', 'fast')
         salt_percent = float(data.get('salt_percent', 2.2))
         # Custom mode fallbacks
         starter_percent = float(data.get('starter_percent', 20)) if speed == 'custom' else None
