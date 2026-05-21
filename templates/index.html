@@ -3,363 +3,200 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sourdough Schedule Planner</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f5f5f5;
-        }
-        .container {
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        h1 {
-            color: #8B4513;
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        .form-group {
-            margin-bottom: 20px;
-        }
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
-            color: #333;
-        }
-        input, select, textarea {
-            width: 100%;
-            padding: 10px;
-            border: 2px solid #ddd;
-            border-radius: 5px;
-            font-size: 16px;
-            box-sizing: border-box;
-        }
-        button {
-            background-color: #8B4513;
-            color: white;
-            padding: 12px 30px;
-            border: none;
-            border-radius: 5px;
-            font-size: 16px;
-            cursor: pointer;
-            width: 100%;
-        }
-        button:hover {
-            background-color: #A0522D;
-        }
-        .results {
-            margin-top: 30px;
-            padding: 20px;
-            background-color: #f9f9f9;
-            border-radius: 5px;
-        }
-        .ingredients, .timeline {
-            margin-bottom: 30px;
-        }
-        .ingredient-item, .timeline-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 0;
-            border-bottom: 1px solid #eee;
-        }
-        .day-header {
-            background-color: #8B4513;
-            color: white;
-            padding: 10px;
-            margin: 20px 0 10px 0;
-            border-radius: 5px;
-            font-weight: bold;
-        }
-        .step {
-            padding: 8px 0;
-            border-bottom: 1px solid #eee;
-        }
-        .step-time {
-            font-weight: bold;
-            color: #8B4513;
-        }
-        .step-description {
-            color: #666;
-            font-size: 14px;
-            margin-top: 5px;
-        }
-        .ratio-info {
-            background-color: #e8f4fd;
-            padding: 10px;
-            border-radius: 5px;
-            margin-top: 10px;
-            font-size: 14px;
-            color: #333;
-        }
-        .starter-feeding {
-            background-color: #fff3cd;
-            padding: 15px;
-            border-radius: 5px;
-            margin-bottom: 15px;
-        }
-        .no-waste-indicator {
-            color: #28a745;
-            font-weight: bold;
-            font-size: 12px;
-        }
-        .current-time-note {
-            font-size: 12px;
-            color: #666;
-            margin-top: 5px;
-        }
-    </style>
+    <title>Sourdough Bread Planner</title>
+    <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-    <div class="container">
-        <h1>🍞 Sourdough Schedule Planner</h1>
-        
-        <form id="scheduleForm">
-            <div class="form-group">
-                <label for="existing_starter_amount">Existing Starter Amount (grams):</label>
-                <input type="number" id="existing_starter_amount" name="existing_starter_amount" value="15" max="200">
-            </div>
-            
-            <div class="form-group">
-                <label for="feeding_ratio">Feeding Ratio:</label>
-                <select id="feeding_ratio" name="feeding_ratio">
-                    <option value="1:1:1">1:1:1 - Fast (4-6 hours) - Same day baking</option>
-                    <option value="1:2:2">1:2:2 - Moderate (6-8 hours) - Balanced timing</option>
-                    <option value="1:3:3">1:3:3 - Standard (8-10 hours) - Daily maintenance</option>
-                    <option value="1:4:4" selected>1:4:4 - Professional (10-12 hours) - Most common</option>
-                    <option value="1:5:5">1:5:5 - Overnight (12-14 hours) - Work schedule</option>
-                    <option value="1:10:10">1:10:10 - Extended (16-24 hours) - Weekend baking</option>
-                </select>
-                <div class="ratio-info" id="ratioInfo">
-                    Select a feeding ratio to see timing information
+    <div class="app-container">
+        <header class="app-header">
+            <h1>Sourdough Bread Planner</h1>
+            <p class="subtitle">Generate a personalized baking schedule with precise timing and ingredient calculations</p>
+        </header>
+
+        <main class="planner-form">
+            <form id="scheduleForm">
+                <!-- Section 1: Recipe Parameters -->
+                <section class="form-section">
+                    <div class="section-header">
+                        <h2>Recipe Parameters</h2>
+                        <p class="section-description">Set your desired dough characteristics. Flour, water, and salt are calculated based on your starter and baker's percentages.</p>
+                    </div>
+
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="total_flour_weight">Total Flour Weight (g)</label>
+                            <input type="number" id="total_flour_weight" name="total_flour_weight" value="500" min="200" max="2000" step="10">
+                            <span class="form-hint">Standard loaf: 500g</span>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="hydration">Hydration (%)</label>
+                            <input type="number" id="hydration" name="hydration" value="75" min="60" max="90" step="1">
+                            <span class="form-hint">75% recommended for beginners</span>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="salt_percent">Salt (%)</label>
+                            <input type="number" id="salt_percent" name="salt_percent" value="2.2" min="1.5" max="3.0" step="0.1">
+                            <span class="form-hint">2.0-2.2% is standard</span>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="starter_percent">Starter (%)</label>
+                            <input type="number" id="starter_percent" name="starter_percent" value="20" min="5" max="40" step="1">
+                            <span class="form-hint">20% = 100g for 500g flour</span>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="flour_type">Flour Type</label>
+                            <select id="flour_type" name="flour_type">
+                                <option value="bread flour" selected>Bread Flour</option>
+                                <option value="all-purpose flour">All-Purpose Flour</option>
+                                <option value="whole wheat flour">Whole Wheat Flour</option>
+                                <option value="mixed flour">Mixed Flour (blend)</option>
+                            </select>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Section 2: Starter Maintenance -->
+                <section class="form-section">
+                    <div class="section-header">
+                        <h2>Starter Maintenance</h2>
+                        <p class="section-description">Configure your starter feeding to produce enough active starter for the recipe while retaining some for future bakes.</p>
+                    </div>
+
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="existing_starter_amount">Existing Starter (g)</label>
+                            <input type="number" id="existing_starter_amount" name="existing_starter_amount" value="50" min="5" max="200" step="5">
+                            <span class="form-hint">Amount you'll feed from your jar</span>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="feeding_ratio">Feeding Ratio</label>
+                            <select id="feeding_ratio" name="feeding_ratio">
+                                {% for ratio, description in feeding_ratios.items() %}
+                                <option value="{{ ratio }}" {% if ratio == '1:5:5' %}selected{% endif %}>{{ ratio }} - {{ description }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="info-box" id="starterInfo">
+                        <strong>Starter Calculation Preview:</strong>
+                        <span id="starterPreview">Select options to see starter feeding amounts</span>
+                    </div>
+                </section>
+
+                <!-- Section 3: Timeline Preferences -->
+                <section class="form-section">
+                    <div class="section-header">
+                        <h2>Timeline Preferences</h2>
+                        <p class="section-description">Customize your schedule based on your kitchen environment and available time.</p>
+                    </div>
+
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="start_time">Starter Feeding Time</label>
+                            <input type="text" id="start_time" name="start_time" placeholder="e.g., 8:00 PM">
+                            <span class="form-hint" id="currentTimeHint">Will auto-fill with current time</span>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="temperature_f">Kitchen Temperature (°F)</label>
+                            <input type="number" id="temperature_f" name="temperature_f" value="70" min="60" max="90" step="1">
+                            <span class="form-hint" id="bulkEstimate">~9 hours bulk fermentation</span>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="cold_proof_hours">Cold Proof Duration (hours)</label>
+                            <input type="number" id="cold_proof_hours" name="cold_proof_hours" value="24" min="1" max="48" step="1">
+                            <span class="form-hint">24-48 hours for best flavor and crumb</span>
+                        </div>
+                    </div>
+
+                    <!-- Toggleable Steps -->
+                    <div class="toggle-section">
+                        <h3>Optional Steps</h3>
+                        <p class="section-description">Enable or disable optional steps to match your preferred method.</p>
+
+                        <div class="toggle-grid">
+                            <label class="toggle-item">
+                                <input type="checkbox" name="step_autolyse" id="step_autolyse">
+                                <span class="toggle-label">
+                                    <strong>Autolyse</strong>
+                                    <small>Mix flour + water before adding starter/salt (30 min)</small>
+                                </span>
+                            </label>
+
+                            <label class="toggle-item">
+                                <input type="checkbox" name="step_rest_after_mix" id="step_rest_after_mix" checked>
+                                <span class="toggle-label">
+                                    <strong>Rest After Mixing</strong>
+                                    <small>30-minute rest before stretch and folds</small>
+                                </span>
+                            </label>
+
+                            <label class="toggle-item">
+                                <input type="checkbox" name="step_folds" id="step_folds" checked>
+                                <span class="toggle-label">
+                                    <strong>Stretch & Folds (4 sets)</strong>
+                                    <small>Every 30 minutes for 2 hours</small>
+                                </span>
+                            </label>
+
+                            <label class="toggle-item">
+                                <input type="checkbox" name="step_pre_shape" id="step_pre_shape" checked>
+                                <span class="toggle-label">
+                                    <strong>Pre-shape + Bench Rest</strong>
+                                    <small>Shape loosely, rest 30 min before final shape</small>
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+                </section>
+
+                <button type="submit" class="generate-btn">Generate Baking Schedule</button>
+            </form>
+        </main>
+
+        <!-- Results Section -->
+        <div id="results" class="results-container" style="display: none;">
+            <!-- Ingredients Panel -->
+            <section class="results-section">
+                <h2>Ingredients</h2>
+
+                <div class="ingredients-panels">
+                    <!-- Starter Feeding -->
+                    <div class="ingredient-panel starter-panel">
+                        <h3>Starter Feeding</h3>
+                        <div id="starterFeedingResults"></div>
+                    </div>
+
+                    <!-- Main Dough -->
+                    <div class="ingredient-panel dough-panel">
+                        <h3>Main Dough</h3>
+                        <div id="mainDoughResults"></div>
+                    </div>
+
+                    <!-- Totals -->
+                    <div class="ingredient-panel totals-panel">
+                        <h3>Totals</h3>
+                        <div id="totalsResults"></div>
+                    </div>
                 </div>
-            </div>
-            
-            <div class="form-group">
-                <label for="start_time">Starter Feeding Time:</label>
-                <input type="text" id="start_time" name="start_time" value="" placeholder="e.g., 8:00 AM">
-                <div class="current-time-note">Will auto-fill with your current local time</div>
-            </div>
-            
-            <div class="form-group">
-                <label for="hydration">Hydration (%):</label>
-                <input type="number" id="hydration" name="hydration" value="70" min="60" max="85" step="1">
-            </div>
-            
-            <div class="form-group">
-                <label for="flour_type">Flour Type:</label>
-                <select id="flour_type" name="flour_type">
-                    <option value="bread flour">Bread Flour</option>
-                    <option value="all-purpose flour">All-Purpose Flour</option>
-                    <option value="whole wheat flour">Whole Wheat Flour</option>
-                    <option value="mixed flour">Mixed Flour</option>
-                </select>
-            </div>
-            
-            <div class="form-group">
-                <label for="notes">Notes (optional):</label>
-                <textarea id="notes" name="notes" rows="3" placeholder="Any special notes or adjustments..."></textarea>
-            </div>
-            
-            <button type="submit">Generate Schedule</button>
-        </form>
-        
-        <div id="results" class="results" style="display: none;">
-            <h2>Your Sourdough Schedule</h2>
-            
-            <div class="ingredients">
-                <h3>📋 Ingredients</h3>
-                <div id="ingredientsList"></div>
-            </div>
-            
-            <div class="timeline">
-                <h3>⏰ Timeline</h3>
-                <div id="timelineList"></div>
-            </div>
+            </section>
+
+            <!-- Timeline Panel -->
+            <section class="results-section">
+                <h2>Baking Timeline</h2>
+                <div class="timeline-info" id="timelineInfo"></div>
+                <div class="timeline-visual" id="timelineVisual"></div>
+            </section>
         </div>
     </div>
 
-    <script>
-        const ratioDescriptions = {
-            '1:1:1': 'Fast timing (4-6 hours to peak) - Good for same-day baking',
-            '1:2:2': 'Moderate timing (6-8 hours to peak) - Balanced approach',
-            '1:3:3': 'Standard timing (8-10 hours to peak) - Daily maintenance',
-            '1:4:4': 'Professional timing (10-12 hours to peak) - Most common choice',
-            '1:5:5': 'Overnight timing (12-14 hours to peak) - Perfect for work schedules',
-            '1:10:10': 'Extended timing (16-24 hours to peak) - Weekend baking'
-        };
-
-        // Update ratio info when selection changes
-        document.getElementById('feeding_ratio').addEventListener('change', function() {
-            const selectedRatio = this.value;
-            const infoDiv = document.getElementById('ratioInfo');
-            infoDiv.textContent = ratioDescriptions[selectedRatio] || 'Select a feeding ratio';
-        });
-
-        // Initialize ratio info and set current time
-        document.addEventListener('DOMContentLoaded', function() {
-            // Set current local time
-            const now = new Date();
-            let hours = now.getHours();
-            const minutes = now.getMinutes();
-            const ampm = hours >= 12 ? 'PM' : 'AM';
-            
-            // Convert to 12-hour format
-            hours = hours % 12;
-            hours = hours ? hours : 12; // 0 should be 12
-            
-            // Format minutes with leading zero if needed
-            const minutesStr = minutes < 10 ? '0' + minutes : minutes;
-            
-            // Set the current time in the input field
-            const currentTime = `${hours}:${minutesStr} ${ampm}`;
-            document.getElementById('start_time').value = currentTime;
-            
-            // Update the note to show the current time
-            document.querySelector('.current-time-note').textContent = `Current local time: ${currentTime}`;
-            
-            // Initialize ratio info
-            const initialRatio = document.getElementById('feeding_ratio').value;
-            const infoDiv = document.getElementById('ratioInfo');
-            infoDiv.textContent = ratioDescriptions[initialRatio] || 'Select a feeding ratio';
-        });
-
-        document.getElementById('scheduleForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const formData = new FormData(this);
-            const data = {
-                existing_starter_amount: parseFloat(formData.get('existing_starter_amount')),
-                feeding_ratio: formData.get('feeding_ratio'),
-                start_time: formData.get('start_time'),
-                hydration: parseInt(formData.get('hydration')),
-                flour_type: formData.get('flour_type'),
-                notes: formData.get('notes')
-            };
-            
-            console.log('Sending data:', data); // Debug log
-            
-            try {
-                const response = await fetch('/generate', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(data)
-                });
-                
-                console.log('Response status:', response.status); // Debug log
-                console.log('Response headers:', response.headers.get('content-type')); // Debug log
-                
-                // Check if response is actually JSON
-                const contentType = response.headers.get('content-type');
-                if (!contentType || !contentType.includes('application/json')) {
-                    const textResponse = await response.text();
-                    console.error('Non-JSON response:', textResponse);
-                    alert('Server error: Received non-JSON response. Check console for details.');
-                    return;
-                }
-                
-                const result = await response.json();
-                console.log('Parsed result:', result); // Debug log
-                
-                if (result.success) {
-                    displayResults(result);
-                } else {
-                    alert('Error: ' + result.error);
-                }
-            } catch (error) {
-                console.error('Fetch error:', error);
-                alert('Error generating schedule: ' + error.message);
-            }
-        });
-        
-        function displayResults(data) {
-            const resultsDiv = document.getElementById('results');
-            const ingredientsDiv = document.getElementById('ingredientsList');
-            const timelineDiv = document.getElementById('timelineList');
-            
-            // Display ingredients
-            const ingredients = data.ingredients;
-            const starterFeeding = ingredients.starter_feeding;
-            
-            ingredientsDiv.innerHTML = `
-                <div class="starter-feeding">
-                    <h4>Starter Feeding (${data.feeding_ratio})</h4>
-                    <div class="ingredient-item">
-                        <span>Existing Starter:</span>
-                        <span><strong>${starterFeeding.existing_starter_used}g</strong></span>
-                    </div>
-                    <div class="ingredient-item">
-                        <span>Add Flour:</span>
-                        <span><strong>${starterFeeding.flour_to_add}g</strong></span>
-                    </div>
-                    <div class="ingredient-item">
-                        <span>Add Water:</span>
-                        <span><strong>${starterFeeding.water_to_add}g</strong></span>
-                    </div>
-                    <div class="ingredient-item" style="border-top: 2px solid #8B4513; margin-top: 10px; padding-top: 10px;">
-                        <span>Total Active Starter:</span>
-                        <span><strong>${starterFeeding.total_after_feeding}g</strong> (all used in recipe)</span>
-                    </div>
-                </div>
-                
-                <h4>Main Dough</h4>
-                <div class="ingredient-item">
-                    <span>Active Starter:</span>
-                    <span><strong>${ingredients.starter_for_bread}g</strong></span>
-                </div>
-                <div class="ingredient-item">
-                    <span>Additional Flour:</span>
-                    <span><strong>${ingredients.main_flour}g</strong></span>
-                </div>
-                <div class="ingredient-item">
-                    <span>Additional Water:</span>
-                    <span><strong>${ingredients.main_water}g</strong></span>
-                </div>
-                <div class="ingredient-item">
-                    <span>Salt:</span>
-                    <span><strong>${ingredients.salt}g</strong></span>
-                </div>
-                
-                <h4>Totals</h4>
-                <div class="ingredient-item">
-                    <span>Total Flour:</span>
-                    <span><strong>${ingredients.total_flour}g</strong></span>
-                </div>
-                <div class="ingredient-item">
-                    <span>Total Water:</span>
-                    <span><strong>${ingredients.total_water}g</strong></span>
-                </div>
-                <div class="ingredient-item">
-                    <span>Final Hydration:</span>
-                    <span><strong>${ingredients.final_hydration}%</strong></span>
-                </div>
-            `;
-            
-            // Display timeline
-            let timelineHTML = '';
-            data.days.forEach(day => {
-                timelineHTML += `<div class="day-header">${day.date}</div>`;
-                day.steps.forEach(step => {
-                    timelineHTML += `
-                        <div class="step">
-                            <div class="step-time">${step.time} - ${step.step}</div>
-                            <div class="step-description">${step.description}</div>
-                        </div>
-                    `;
-                });
-            });
-            
-            timelineDiv.innerHTML = timelineHTML;
-            resultsDiv.style.display = 'block';
-            resultsDiv.scrollIntoView({ behavior: 'smooth' });
-        }
-    </script>
+    <script src="/static/js/app.js"></script>
 </body>
 </html>
