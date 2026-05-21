@@ -74,6 +74,10 @@ class TestStepDefinitions:
         assert tl.STEP_DEFINITIONS['final_shape']['toggleable'] is False
         assert tl.STEP_DEFINITIONS['score_and_bake']['toggleable'] is False
 
+    def test_mix_dough_has_10_min_duration(self, tl):
+        """Mix dough step should have a 10-minute duration."""
+        assert tl.STEP_DEFINITIONS['mix_dough']['default_duration_minutes'] == 10
+
 
 class TestTimelineGeneration:
     """Tests for full timeline generation."""
@@ -221,6 +225,46 @@ class TestTimelineGeneration:
 
         # Overall timeline should be mostly chronological
         # (preheat may start before cold proof ends, which is intentional)
+
+    def test_mix_to_first_fold_timing(self, tl):
+        """First stretch & fold should be 40 min after mix starts (10 min mix + 30 min rest)."""
+        from datetime import datetime
+        days = tl.generate_timeline(
+            start_time_str='8:00 AM',
+            feeding_ratio_peak_hours=5,
+            temperature_f=70,
+            cold_proof_hours=24,
+            start_date=date(2025, 1, 1)
+        )
+        # Find mix_dough, rest_after_mix, and stretch_fold_1 times
+        mix_time = None
+        fold1_time = None
+        fold2_time = None
+        rest_time = None
+        for day in days:
+            for step in day['steps']:
+                if step['step_id'] == 'mix_dough':
+                    mix_time = datetime.fromisoformat(step['datetime'])
+                elif step['step_id'] == 'rest_after_mix':
+                    rest_time = datetime.fromisoformat(step['datetime'])
+                elif step['step_id'] == 'stretch_fold_1':
+                    fold1_time = datetime.fromisoformat(step['datetime'])
+                elif step['step_id'] == 'stretch_fold_2':
+                    fold2_time = datetime.fromisoformat(step['datetime'])
+
+        assert mix_time is not None
+        assert rest_time is not None
+        assert fold1_time is not None
+        assert fold2_time is not None
+
+        # Rest should start 10 min after mix (mix duration)
+        assert (rest_time - mix_time).total_seconds() == 600  # 10 minutes
+
+        # First fold should be 40 min after mix starts (10 min mix + 30 min rest)
+        assert (fold1_time - mix_time).total_seconds() == 2400  # 40 minutes
+
+        # Second fold should be 30 min after first fold
+        assert (fold2_time - fold1_time).total_seconds() == 1800  # 30 minutes
 
 
 class TestTimeParsing:

@@ -58,7 +58,8 @@ class TimelineGenerator:
             'visual_cue': 'All flour should be incorporated. Dough will be sticky and rough — this is normal.',
             'category': 'mixing',
             'toggleable': False,
-            'default_enabled': True
+            'default_enabled': True,
+            'default_duration_minutes': 10
         },
         'rest_after_mix': {
             'name': 'Rest After Mixing',
@@ -293,21 +294,29 @@ class TimelineGenerator:
             timeline.append(self._make_entry('autolyse', autolyse_start,
                                              note=f'Start {autolyse_duration} min before starter peaks'))
 
-        # 4. Mix Dough
+        # 4. Mix Dough (takes ~10 minutes)
         timeline.append(self._make_entry('mix_dough', current_dt))
+        mix_duration = get_duration('mix_dough')
+        current_dt += timedelta(minutes=mix_duration)
 
-        # 5. Rest After Mixing
+        # 5. Rest After Mixing (starts after mix is complete)
         if is_enabled('rest_after_mix'):
             rest_duration = get_duration('rest_after_mix')
-            current_dt += timedelta(minutes=rest_duration)
             timeline.append(self._make_entry('rest_after_mix', current_dt,
                                              note=f'{rest_duration} min rest'))
+            current_dt += timedelta(minutes=rest_duration)
 
         # 6-9. Stretch and Folds
+        # First fold happens immediately after rest ends.
+        # Subsequent folds are spaced by fold_interval_minutes.
         fold_steps = ['stretch_fold_1', 'stretch_fold_2', 'stretch_fold_3', 'stretch_fold_4']
+        first_fold = True
         for fold_step in fold_steps:
             if is_enabled(fold_step):
-                current_dt += timedelta(minutes=fold_interval_minutes)
+                if first_fold:
+                    first_fold = False
+                else:
+                    current_dt += timedelta(minutes=fold_interval_minutes)
                 timeline.append(self._make_entry(fold_step, current_dt))
 
         # 10. Bulk Fermentation
