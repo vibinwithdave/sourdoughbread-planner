@@ -68,21 +68,29 @@ def get_steps():
 def preview_recipe():
     """
     Live preview endpoint: derive flour, water, salt from starter amount
-    and baker's percentages. Called on every input change in the UI.
+    and fermentation speed (or custom percentages).
     """
     try:
         data = request.json or {}
         starter_amount = float(data.get('starter_amount', 100))
-        starter_percent = float(data.get('starter_percent', 20))
-        hydration = float(data.get('hydration', 75))
+        speed = data.get('fermentation_speed', 'regular')
         salt_percent = float(data.get('salt_percent', 2.2))
 
-        recipe = calculator.derive_recipe_from_starter(
-            starter_amount=starter_amount,
-            starter_percent=starter_percent,
-            hydration=hydration,
-            salt_percent=salt_percent
-        )
+        if speed and speed != 'custom' and speed in calculator.SPEED_RATIOS:
+            recipe = calculator.derive_recipe_from_speed(
+                starter_amount=starter_amount,
+                speed=speed,
+                salt_percent=salt_percent
+            )
+        else:
+            starter_percent = float(data.get('starter_percent', 20))
+            hydration = float(data.get('hydration', 75))
+            recipe = calculator.derive_recipe_from_starter(
+                starter_amount=starter_amount,
+                starter_percent=starter_percent,
+                hydration=hydration,
+                salt_percent=salt_percent
+            )
         return jsonify({'success': True, 'recipe': recipe})
     except ValueError as e:
         return jsonify({'success': False, 'error': str(e)}), 400
@@ -112,11 +120,13 @@ def generate_schedule():
     try:
         data = request.json if request.is_json else request.form.to_dict()
 
-        # Primary inputs: starter amount drives the recipe
+        # Primary inputs: starter amount + speed drives the recipe
         starter_amount = float(data.get('starter_amount', 100))
-        starter_percent = float(data.get('starter_percent', 20))
-        hydration = float(data.get('hydration', 75))
+        speed = data.get('fermentation_speed', 'regular')
         salt_percent = float(data.get('salt_percent', 2.2))
+        # Custom mode fallbacks
+        starter_percent = float(data.get('starter_percent', 20)) if speed == 'custom' else None
+        hydration = float(data.get('hydration', 75)) if speed == 'custom' else None
         existing_starter_amount = float(data.get('existing_starter_amount', 50))
         feeding_ratio = data.get('feeding_ratio', '1:5:5')
         start_time = data.get('start_time', '8:00 PM')
@@ -145,14 +155,15 @@ def generate_schedule():
             return jsonify({'success': False,
                             'error': f'Invalid feeding ratio: {feeding_ratio}'}), 400
 
-        # Calculate ingredients (starter-amount-driven)
+        # Calculate ingredients (starter-amount + speed driven)
         ingredients = calculator.calculate_ingredients(
             starter_amount=starter_amount,
+            existing_starter_amount=existing_starter_amount,
+            feeding_ratio=feeding_ratio,
+            speed=speed if speed != 'custom' else None,
             starter_percent=starter_percent,
             hydration=hydration,
-            salt_percent=salt_percent,
-            existing_starter_amount=existing_starter_amount,
-            feeding_ratio=feeding_ratio
+            salt_percent=salt_percent
         )
 
         # Get peak hours for the feeding ratio
@@ -182,7 +193,8 @@ def generate_schedule():
                 'temperature_f': temperature_f,
                 'bulk_fermentation_estimate': bulk_estimate,
                 'cold_proof_hours': cold_proof_hours,
-                'hydration': hydration
+                'hydration': ingredients['actual_hydration'],
+                'fermentation_speed': speed
             }
         })
 

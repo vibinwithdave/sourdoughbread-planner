@@ -45,11 +45,11 @@ class TestHealthAndInfo:
 class TestPreviewEndpoint:
     """Tests for the live recipe preview endpoint."""
 
-    def test_preview_standard(self, client):
+    def test_preview_speed_regular(self, client):
+        """Regular speed with 75g starter should give 500g flour, 375g water."""
         response = client.post('/api/preview', json={
-            'starter_amount': 100,
-            'starter_percent': 20,
-            'hydration': 75,
+            'starter_amount': 75,
+            'fermentation_speed': 'regular',
             'salt_percent': 2.2
         })
         assert response.status_code == 200
@@ -59,10 +59,34 @@ class TestPreviewEndpoint:
         assert data['recipe']['total_water'] == 375.0
         assert data['recipe']['salt'] == 11.0
 
-    def test_preview_with_different_starter(self, client):
+    def test_preview_speed_slow(self, client):
+        """Slow speed with 25g starter should scale to 250g flour, 187.5g water."""
         response = client.post('/api/preview', json={
-            'starter_amount': 50,
-            'starter_percent': 10,
+            'starter_amount': 25,
+            'fermentation_speed': 'slow',
+            'salt_percent': 2.2
+        })
+        data = response.get_json()
+        assert data['recipe']['total_flour'] == 250.0
+        assert data['recipe']['total_water'] == 187.5
+
+    def test_preview_speed_fast(self, client):
+        """Fast speed with 100g starter should give 500g flour, 375g water."""
+        response = client.post('/api/preview', json={
+            'starter_amount': 100,
+            'fermentation_speed': 'fast',
+            'salt_percent': 2.2
+        })
+        data = response.get_json()
+        assert data['recipe']['total_flour'] == 500.0
+        assert data['recipe']['total_water'] == 375.0
+
+    def test_preview_custom_mode(self, client):
+        """Custom mode should use starter_percent and hydration."""
+        response = client.post('/api/preview', json={
+            'starter_amount': 100,
+            'fermentation_speed': 'custom',
+            'starter_percent': 20,
             'hydration': 80,
             'salt_percent': 2.0
         })
@@ -70,9 +94,11 @@ class TestPreviewEndpoint:
         assert data['recipe']['total_flour'] == 500.0
         assert data['recipe']['total_water'] == 400.0
 
-    def test_preview_invalid_percent(self, client):
+    def test_preview_custom_invalid_percent(self, client):
+        """Custom mode with 0% starter should return 400."""
         response = client.post('/api/preview', json={
             'starter_amount': 100,
+            'fermentation_speed': 'custom',
             'starter_percent': 0,
             'hydration': 75,
             'salt_percent': 2.0
@@ -110,10 +136,47 @@ class TestGenerateSchedule:
         assert 'timeline' in data
         assert 'settings' in data
 
-    def test_generate_alexandra_cooks_style(self, client):
-        """Test generating a schedule matching the Alexandra Cooks recipe."""
+    def test_generate_speed_slow(self, client):
+        """Slow speed with 50g starter should produce 500g flour, 375g water."""
+        response = client.post('/api/generate', json={
+            'starter_amount': 50,
+            'fermentation_speed': 'slow',
+            'salt_percent': 2.2,
+            'existing_starter_amount': 50,
+            'feeding_ratio': '1:5:5',
+            'start_time': '8:00 PM',
+            'temperature_f': 70,
+            'cold_proof_hours': 24
+        })
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['success'] is True
+        assert data['ingredients']['total_flour_weight'] == 500.0
+        assert data['ingredients']['total_water'] == 375.0
+        assert data['settings']['fermentation_speed'] == 'slow'
+
+    def test_generate_speed_fast(self, client):
+        """Fast speed with 100g starter should produce 500g flour, 375g water."""
         response = client.post('/api/generate', json={
             'starter_amount': 100,
+            'fermentation_speed': 'fast',
+            'salt_percent': 2.2,
+            'existing_starter_amount': 50,
+            'feeding_ratio': '1:5:5',
+            'start_time': '8:00 PM',
+            'temperature_f': 70,
+            'cold_proof_hours': 24
+        })
+        data = response.get_json()
+        assert data['ingredients']['total_flour_weight'] == 500.0
+        assert data['ingredients']['total_water'] == 375.0
+        assert data['settings']['fermentation_speed'] == 'fast'
+
+    def test_generate_custom_mode(self, client):
+        """Custom mode should use starter_percent and hydration."""
+        response = client.post('/api/generate', json={
+            'starter_amount': 100,
+            'fermentation_speed': 'custom',
             'starter_percent': 20,
             'hydration': 75,
             'salt_percent': 2.2,
@@ -121,29 +184,28 @@ class TestGenerateSchedule:
             'feeding_ratio': '1:5:5',
             'start_time': '8:00 PM',
             'temperature_f': 70,
-            'cold_proof_hours': 24,
-            'flour_type': 'bread flour',
-            'enabled_steps': {
-                'autolyse': False,
-                'rest_after_mix': True,
-                'stretch_fold_1': True,
-                'stretch_fold_2': True,
-                'stretch_fold_3': True,
-                'stretch_fold_4': True,
-                'pre_shape': True,
-                'bench_rest': True
-            }
+            'cold_proof_hours': 24
         })
-        assert response.status_code == 200
         data = response.get_json()
-        assert data['success'] is True
+        assert data['ingredients']['total_flour_weight'] == 500.0
+        assert data['ingredients']['total_water'] == 375.0
+        assert data['settings']['fermentation_speed'] == 'custom'
 
-        # Verify ingredients match expected
-        ingredients = data['ingredients']
-        assert ingredients['total_flour_weight'] == 500.0
-        assert ingredients['starter_amount'] == 100.0
-        assert ingredients['salt'] == 11.0
-        assert ingredients['total_water'] == 375.0
+    def test_generate_scaled_recipe(self, client):
+        """25g starter at slow speed should scale to 250g flour."""
+        response = client.post('/api/generate', json={
+            'starter_amount': 25,
+            'fermentation_speed': 'slow',
+            'salt_percent': 2.2,
+            'existing_starter_amount': 25,
+            'feeding_ratio': '1:5:5',
+            'start_time': '8:00 PM',
+            'temperature_f': 70,
+            'cold_proof_hours': 24
+        })
+        data = response.get_json()
+        assert data['ingredients']['total_flour_weight'] == 250.0
+        assert data['ingredients']['total_water'] == 187.5
 
     def test_generate_with_invalid_ratio(self, client):
         response = client.post('/api/generate', json={
@@ -163,6 +225,8 @@ class TestGenerateSchedule:
 
     def test_generate_settings_returned(self, client):
         response = client.post('/api/generate', json={
+            'starter_amount': 100,
+            'fermentation_speed': 'fast',
             'temperature_f': 75,
             'cold_proof_hours': 36,
             'feeding_ratio': '1:4:4'
@@ -172,3 +236,4 @@ class TestGenerateSchedule:
         assert settings['temperature_f'] == 75
         assert settings['cold_proof_hours'] == 36
         assert settings['feeding_ratio'] == '1:4:4'
+        assert settings['fermentation_speed'] == 'fast'

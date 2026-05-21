@@ -59,6 +59,14 @@ class IngredientCalculator:
         }
     }
 
+    # Fermentation speed ratios (starter : water : flour)
+    # Based on Alexandra Cooks recipe: varying starter with fixed water/flour ratio
+    SPEED_RATIOS = {
+        'slow':    {'starter': 50,  'water': 375, 'flour': 500},
+        'regular': {'starter': 75,  'water': 375, 'flour': 500},
+        'fast':    {'starter': 100, 'water': 375, 'flour': 500}
+    }
+
     # Default baker's percentages
     DEFAULT_HYDRATION = 75
     DEFAULT_SALT_PERCENT = 2.2
@@ -71,6 +79,58 @@ class IngredientCalculator:
     def get_feeding_ratios(self):
         """Return available feeding ratios for frontend display."""
         return {k: v['description'] for k, v in self.FEEDING_RATIOS.items()}
+
+    def derive_recipe_from_speed(self, starter_amount, speed, salt_percent=2.2):
+        """
+        Derive flour and water from the starter amount and fermentation speed.
+
+        The speed defines a ratio between starter, water, and flour.
+        Given the user's starter amount, flour and water are scaled proportionally.
+
+        For example, 'slow' ratio is 50:375:500. If user inputs 25g starter:
+          - flour = 25 * (500/50) = 250g
+          - water = 25 * (375/50) = 187.5g
+
+        Args:
+            starter_amount: Grams of active starter the user wants to use
+            speed: One of 'slow', 'regular', 'fast'
+            salt_percent: Salt as % of total flour (default 2.2)
+
+        Returns:
+            dict with total_flour, total_water, salt, additional_flour, additional_water, etc.
+        """
+        if speed not in self.SPEED_RATIOS:
+            raise ValueError(f"Invalid speed: {speed}. Must be one of: {list(self.SPEED_RATIOS.keys())}")
+
+        ratio = self.SPEED_RATIOS[speed]
+        scale_factor = starter_amount / ratio['starter']
+
+        total_flour = ratio['flour'] * scale_factor
+        total_water = ratio['water'] * scale_factor
+        salt = total_flour * (salt_percent / 100)
+
+        # Starter contributes flour and water (assumes 100% hydration starter)
+        starter_flour_contribution = starter_amount / 2
+        starter_water_contribution = starter_amount / 2
+
+        additional_flour = total_flour - starter_flour_contribution
+        additional_water = total_water - starter_water_contribution
+
+        total_dough_weight = total_flour + total_water + salt + starter_amount
+        actual_hydration = (total_water / total_flour) * 100 if total_flour > 0 else 0
+
+        return {
+            'starter_amount': round(starter_amount, 1),
+            'speed': speed,
+            'total_flour': round(total_flour, 1),
+            'total_water': round(total_water, 1),
+            'additional_flour': round(additional_flour, 1),
+            'additional_water': round(additional_water, 1),
+            'salt': round(salt, 1),
+            'hydration': round(actual_hydration, 1),
+            'salt_percent': salt_percent,
+            'total_dough_weight': round(total_dough_weight, 1)
+        }
 
     def derive_flour_weight(self, starter_amount, starter_percent):
         """
@@ -168,29 +228,40 @@ class IngredientCalculator:
             'sufficient': total_after_feeding >= starter_needed_for_recipe
         }
 
-    def calculate_ingredients(self, starter_amount, starter_percent, hydration,
-                              salt_percent, existing_starter_amount, feeding_ratio):
+    def calculate_ingredients(self, starter_amount, existing_starter_amount, feeding_ratio,
+                              speed=None, starter_percent=None, hydration=None,
+                              salt_percent=2.2):
         """
         Calculate all ingredient amounts driven by the starter amount.
 
-        The starter amount and starter % determine the total flour weight.
-        Hydration % and salt % then determine water and salt.
+        Two modes:
+        1. Speed-based (primary): starter_amount + speed -> flour/water derived from ratio
+        2. Percentage-based (custom): starter_amount + starter_percent + hydration
 
         Args:
             starter_amount: Grams of active starter to use in recipe (e.g., 100)
-            starter_percent: Starter as percentage of total flour (e.g., 20)
-            hydration: Target hydration percentage (e.g., 75)
-            salt_percent: Salt as percentage of total flour (e.g., 2.2)
             existing_starter_amount: Grams of existing starter to feed
             feeding_ratio: String like '1:4:4'
+            speed: Fermentation speed ('slow', 'regular', 'fast') or None for custom
+            starter_percent: Starter as percentage of total flour (for custom mode)
+            hydration: Target hydration percentage (for custom mode)
+            salt_percent: Salt as percentage of total flour (e.g., 2.2)
 
         Returns:
             dict with all ingredient amounts and feeding info
         """
-        # Derive recipe from starter amount
-        recipe = self.derive_recipe_from_starter(
-            starter_amount, starter_percent, hydration, salt_percent
-        )
+        # Derive recipe based on mode
+        if speed and speed in self.SPEED_RATIOS:
+            recipe = self.derive_recipe_from_speed(starter_amount, speed, salt_percent)
+        else:
+            # Custom / percentage-based fallback
+            if starter_percent is None:
+                starter_percent = self.DEFAULT_STARTER_PERCENT
+            if hydration is None:
+                hydration = self.DEFAULT_HYDRATION
+            recipe = self.derive_recipe_from_starter(
+                starter_amount, starter_percent, hydration, salt_percent
+            )
 
         # Calculate starter feeding
         starter_feeding = self.calculate_starter_feeding(
@@ -199,7 +270,7 @@ class IngredientCalculator:
 
         return {
             'starter_amount': recipe['starter_amount'],
-            'starter_percent': recipe['starter_percent'],
+            'speed': recipe.get('speed', 'custom'),
             'total_flour_weight': recipe['total_flour'],
             'additional_flour': recipe['additional_flour'],
             'total_water': recipe['total_water'],
