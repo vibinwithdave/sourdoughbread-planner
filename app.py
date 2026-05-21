@@ -128,7 +128,7 @@ def generate_schedule():
         starter_percent = float(data.get('starter_percent', 20)) if speed == 'custom' else None
         hydration = float(data.get('hydration', 75)) if speed == 'custom' else None
         existing_starter_amount = float(data.get('existing_starter_amount', 50))
-        feeding_ratio = data.get('feeding_ratio', '1:5:5')
+        feeding_ratio = data.get('feeding_ratio', '1:1:1')
         start_time = data.get('start_time', '8:00 PM')
         temperature_f = float(data.get('temperature_f', 70))
         cold_proof_hours = float(data.get('cold_proof_hours', 24))

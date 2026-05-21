@@ -119,7 +119,7 @@
                             <label for="feeding_ratio">Feeding Ratio</label>
                             <select id="feeding_ratio" name="feeding_ratio">
                                 {% for ratio, description in feeding_ratios.items() %}
-                                <option value="{{ ratio }}" {% if ratio == '1:5:5' %}selected{% endif %}>{{ ratio }} - {{ description }}</option>
+                                <option value="{{ ratio }}" {% if ratio == '1:1:1' %}selected{% endif %}>{{ ratio }} - {{ description }}</option>
                                 {% endfor %}
                             </select>
                         </div>
