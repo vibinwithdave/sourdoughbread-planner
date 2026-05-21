@@ -1,13 +1,20 @@
 /**
  * Sourdough Bread Planner - Frontend Application
- * Starter-amount-driven: user sets starter (g), starter %, hydration %, salt %
- * and flour/water/salt are dynamically calculated and shown live.
+ * Starter-amount-driven with fermentation speed presets.
+ * Presets fix flour at 500g and water at 375g, varying starter amount.
  */
+
+// Fermentation speed presets (based on Alexandra Cooks recipe)
+const SPEED_PRESETS = {
+    slow:    { starter: 50,  water: 375, flour: 500 },
+    regular: { starter: 75,  water: 375, flour: 500 },
+    fast:    { starter: 100, water: 375, flour: 500 }
+};
 
 document.addEventListener('DOMContentLoaded', function () {
     initializeForm();
     attachEventListeners();
-    updateRecipePreview(); // Show calculated values immediately
+    applyPreset('regular'); // Apply default preset on load
 });
 
 // --- Initialization ---
@@ -36,10 +43,17 @@ function attachEventListeners() {
     // Form submission
     document.getElementById('scheduleForm').addEventListener('submit', handleFormSubmit);
 
+    // Fermentation speed dropdown
+    document.getElementById('fermentation_speed').addEventListener('change', handleSpeedChange);
+
     // Recipe parameter inputs -> update live preview
     const recipeInputs = ['starter_amount', 'starter_percent', 'hydration', 'salt_percent'];
     recipeInputs.forEach(id => {
-        document.getElementById(id).addEventListener('input', updateRecipePreview);
+        document.getElementById(id).addEventListener('input', function () {
+            // If user manually edits, switch to "Custom"
+            switchToCustomIfNeeded();
+            updateRecipePreview();
+        });
     });
 
     // Temperature change -> update bulk estimate
@@ -48,15 +62,71 @@ function attachEventListeners() {
     // Starter maintenance inputs -> update starter preview
     document.getElementById('existing_starter_amount').addEventListener('input', updateStarterPreview);
     document.getElementById('feeding_ratio').addEventListener('change', updateStarterPreview);
-    // Also update starter preview when starter_amount changes (since that's what's needed for recipe)
+    // Also update starter preview when starter_amount changes
     document.getElementById('starter_amount').addEventListener('input', updateStarterPreview);
+}
+
+// --- Fermentation Speed Presets ---
+
+function handleSpeedChange() {
+    const speed = document.getElementById('fermentation_speed').value;
+    if (speed === 'custom') {
+        // Enable manual editing, don't change values
+        return;
+    }
+    applyPreset(speed);
+}
+
+function applyPreset(speed) {
+    const preset = SPEED_PRESETS[speed];
+    if (!preset) return;
+
+    // Set starter amount
+    document.getElementById('starter_amount').value = preset.starter;
+
+    // Calculate the starter % that gives us exactly 500g flour from this starter amount
+    // Formula: starter_percent = (starter_amount / total_flour) * 100
+    const starterPercent = (preset.starter / preset.flour) * 100;
+    document.getElementById('starter_percent').value = roundTo(starterPercent, 1);
+
+    // Calculate hydration % that gives us exactly 375g water from 500g flour
+    // Formula: hydration = (total_water / total_flour) * 100
+    const hydration = (preset.water / preset.flour) * 100;
+    document.getElementById('hydration').value = roundTo(hydration, 1);
+
+    // Update the live preview
+    updateRecipePreview();
+    updateStarterPreview();
+}
+
+function switchToCustomIfNeeded() {
+    const dropdown = document.getElementById('fermentation_speed');
+    if (dropdown.value !== 'custom') {
+        // Check if current values still match the selected preset
+        const speed = dropdown.value;
+        const preset = SPEED_PRESETS[speed];
+        if (!preset) return;
+
+        const currentStarter = parseFloat(document.getElementById('starter_amount').value);
+        const currentStarterPct = parseFloat(document.getElementById('starter_percent').value);
+        const currentHydration = parseFloat(document.getElementById('hydration').value);
+
+        const expectedStarterPct = roundTo((preset.starter / preset.flour) * 100, 1);
+        const expectedHydration = roundTo((preset.water / preset.flour) * 100, 1);
+
+        if (currentStarter !== preset.starter ||
+            currentStarterPct !== expectedStarterPct ||
+            currentHydration !== expectedHydration) {
+            dropdown.value = 'custom';
+        }
+    }
 }
 
 // --- Live Recipe Preview ---
 
 function updateRecipePreview() {
-    const starterAmount = parseFloat(document.getElementById('starter_amount').value) || 100;
-    const starterPercent = parseFloat(document.getElementById('starter_percent').value) || 20;
+    const starterAmount = parseFloat(document.getElementById('starter_amount').value) || 75;
+    const starterPercent = parseFloat(document.getElementById('starter_percent').value) || 15;
     const hydration = parseFloat(document.getElementById('hydration').value) || 75;
     const saltPercent = parseFloat(document.getElementById('salt_percent').value) || 2.2;
 
@@ -119,7 +189,7 @@ function estimateBulkHours(tempF) {
 function updateStarterPreview() {
     const existingStarter = parseFloat(document.getElementById('existing_starter_amount').value) || 50;
     const ratio = document.getElementById('feeding_ratio').value;
-    const starterAmount = parseFloat(document.getElementById('starter_amount').value) || 100;
+    const starterAmount = parseFloat(document.getElementById('starter_amount').value) || 75;
 
     // Parse ratio
     const parts = ratio.split(':').map(Number);
@@ -203,6 +273,7 @@ function collectFormData() {
         temperature_f: parseFloat(document.getElementById('temperature_f').value),
         cold_proof_hours: parseFloat(document.getElementById('cold_proof_hours').value),
         flour_type: document.getElementById('flour_type').value,
+        fermentation_speed: document.getElementById('fermentation_speed').value,
         enabled_steps: enabledSteps
     };
 }

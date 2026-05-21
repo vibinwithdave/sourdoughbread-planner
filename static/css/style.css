@@ -711,7 +711,8 @@ body {
 }
 
 /* --- Primary Input Highlight --- */
-.form-group.primary-input input {
+.form-group.primary-input input,
+.form-group.primary-input select {
     border-color: var(--color-primary);
     background: #FFFDF8;
     font-size: 1.1rem;
@@ -721,4 +722,12 @@ body {
 .form-group.primary-input label {
     color: var(--color-primary);
     font-size: 0.9rem;
+}
+
+.form-group.full-width {
+    grid-column: 1 / -1;
+}
+
+.form-group.primary-input select {
+    cursor: pointer;
 }
