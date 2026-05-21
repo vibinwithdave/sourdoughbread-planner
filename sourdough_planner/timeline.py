@@ -120,8 +120,8 @@ class TimelineGenerator:
         },
         'bench_rest': {
             'name': 'Bench Rest',
-            'description': 'Let the pre-shaped dough rest uncovered on the counter.',
-            'visual_cue': 'Dough will relax and spread slightly. It should still hold a general round shape.',
+            'description': 'Let the pre-shaped dough rest seam-side up, uncovered on the counter.',
+            'visual_cue': 'Dough will relax and spread slightly. Seam-side should be facing up. It should still hold a general round shape.',
             'category': 'shaping',
             'toggleable': True,
             'default_enabled': True,
@@ -130,10 +130,11 @@ class TimelineGenerator:
         'final_shape': {
             'name': 'Final Shape',
             'description': 'Shape dough into final form (round or batard) and place seam-side up in a floured banneton or lined bowl.',
-            'visual_cue': 'Dough should feel taut with good surface tension.',
+            'visual_cue': 'Dough should feel taut with good surface tension. Seam-side faces up in the banneton.',
             'category': 'shaping',
             'toggleable': False,
-            'default_enabled': True
+            'default_enabled': True,
+            'default_duration_minutes': 5
         },
         'cold_proof': {
             'name': 'Cold Proof (Retard)',
@@ -145,6 +146,14 @@ class TimelineGenerator:
             'default_duration_hours': 24,
             'min_duration_hours': 1,
             'max_duration_hours': 48
+        },
+        'remove_from_fridge': {
+            'name': 'Remove from Fridge',
+            'description': 'Take the cold-proofed dough out of the refrigerator. You can bake it straight from the fridge — no need to warm up.',
+            'visual_cue': 'Dough should be slightly puffed and hold its shape. It will feel firm and cold.',
+            'category': 'proofing',
+            'toggleable': False,
+            'default_enabled': True
         },
         'preheat_oven': {
             'name': 'Preheat Oven & Dutch Oven',
@@ -332,22 +341,28 @@ class TimelineGenerator:
         if is_enabled('pre_shape'):
             timeline.append(self._make_entry('pre_shape', current_dt))
 
-        # 12. Bench Rest
+        # 12. Bench Rest (5 min after pre-shape, lasts 30 min)
         if is_enabled('bench_rest'):
+            current_dt += timedelta(minutes=5)
             bench_duration = get_duration('bench_rest')
-            current_dt += timedelta(minutes=bench_duration)
             timeline.append(self._make_entry('bench_rest', current_dt,
-                                             note=f'{bench_duration} min rest'))
+                                             note=f'{bench_duration} min rest, seam-side up'))
+            current_dt += timedelta(minutes=bench_duration)
 
-        # 13. Final Shape
+        # 13. Final Shape (starts after bench rest completes)
         timeline.append(self._make_entry('final_shape', current_dt))
+        final_shape_duration = get_duration('final_shape')
+        current_dt += timedelta(minutes=final_shape_duration)
 
-        # 14. Cold Proof
-        cold_proof_start = current_dt
-        current_dt += timedelta(hours=cold_proof_hours)
+        # 14. Cold Proof (starts 5 min after final shape begins — time to place in fridge)
         timeline.append(self._make_entry('cold_proof', current_dt,
                                          note=f'{cold_proof_hours} hours in fridge. '
                                               f'Longer = more flavor and lighter crumb.'))
+
+        # 15. Remove from Fridge (after cold proof hours elapse)
+        current_dt += timedelta(hours=cold_proof_hours)
+        timeline.append(self._make_entry('remove_from_fridge', current_dt,
+                                         note='Bake straight from fridge — no need to warm up.'))
 
         # 15. Preheat Oven
         preheat_duration = get_duration('preheat_oven')
