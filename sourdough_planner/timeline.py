@@ -320,14 +320,15 @@ class TimelineGenerator:
                 timeline.append(self._make_entry(fold_step, current_dt))
 
         # 10. Bulk Fermentation
-        # Bulk fermentation starts after the last fold and continues
-        bulk_start = current_dt
-        current_dt += timedelta(hours=bulk_hours)
+        # Bulk fermentation starts 30 min after the last fold.
+        # The displayed time is when bulk fermentation BEGINS.
+        current_dt += timedelta(minutes=fold_interval_minutes)
         timeline.append(self._make_entry('bulk_fermentation', current_dt,
                                          note=f'~{bulk_hours} hours at {temperature_f}°F. '
                                               f'Look for 50-75% volume increase.'))
 
-        # 11. Pre-shape
+        # 11. Pre-shape happens after bulk fermentation duration elapses
+        current_dt += timedelta(hours=bulk_hours)
         if is_enabled('pre_shape'):
             timeline.append(self._make_entry('pre_shape', current_dt))
 
