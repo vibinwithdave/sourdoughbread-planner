@@ -130,6 +130,7 @@ def generate_schedule():
         existing_starter_amount = float(data.get('existing_starter_amount', 50))
         feeding_ratio = data.get('feeding_ratio', '1:1:1')
         start_time = data.get('start_time', '8:00 PM')
+        start_from = data.get('start_from', 'feed_starter')  # 'feed_starter' or 'mix_dough'
         temperature_f = float(data.get('temperature_f', 70))
         cold_proof_hours = float(data.get('cold_proof_hours', 24))
         flour_type = data.get('flour_type', 'bread flour')
@@ -176,11 +177,23 @@ def generate_schedule():
             temperature_f=temperature_f,
             cold_proof_hours=cold_proof_hours,
             enabled_steps=enabled_steps,
-            custom_durations=custom_durations
+            custom_durations=custom_durations,
+            start_from=start_from
         )
 
         # Estimate bulk fermentation for display
         bulk_estimate = timeline_gen.estimate_bulk_fermentation_hours(temperature_f)
+
+        # Compute the effective feed time for display
+        computed_feed_time = start_time
+        if start_from == 'mix_dough':
+            # Back-calculate: feed_time = mix_time - peak_hours
+            from datetime import datetime as dt_mod, timedelta as td_mod
+            parsed_time = timeline_gen._parse_time(start_time)
+            from datetime import date as date_mod
+            mix_dt = dt_mod.combine(date_mod.today(), parsed_time)
+            feed_dt = mix_dt - td_mod(hours=peak_hours)
+            computed_feed_time = feed_dt.strftime('%I:%M %p').lstrip('0')
 
         return jsonify({
             'success': True,
@@ -194,7 +207,9 @@ def generate_schedule():
                 'bulk_fermentation_estimate': bulk_estimate,
                 'cold_proof_hours': cold_proof_hours,
                 'hydration': ingredients['actual_hydration'],
-                'fermentation_speed': speed
+                'fermentation_speed': speed,
+                'start_from': start_from,
+                'computed_feed_time': computed_feed_time
             }
         })
 

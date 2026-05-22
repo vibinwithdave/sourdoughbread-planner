@@ -42,6 +42,7 @@ function initializeForm() {
     document.getElementById('start_time').value = currentTime;
     document.getElementById('currentTimeHint').textContent = `Current time: ${currentTime}`;
 
+    handleStartFromChange();
     updateBulkEstimate();
     updateStarterPreview();
 }
@@ -69,12 +70,18 @@ function attachEventListeners() {
         if (el) el.addEventListener('input', updateRecipePreview);
     });
 
+    // Start From dropdown -> update label and hint
+    document.getElementById('start_from').addEventListener('change', handleStartFromChange);
+
     // Temperature change -> update bulk estimate
     document.getElementById('temperature_f').addEventListener('input', updateBulkEstimate);
 
     // Starter maintenance inputs
     document.getElementById('existing_starter_amount').addEventListener('input', updateStarterPreview);
-    document.getElementById('feeding_ratio').addEventListener('change', updateStarterPreview);
+    document.getElementById('feeding_ratio').addEventListener('change', function () {
+        updateStarterPreview();
+        updateStartFromHint();
+    });
 
     // Save and Export buttons
     document.getElementById('saveScheduleBtn').addEventListener('click', saveSchedule);
@@ -93,6 +100,42 @@ function handleSpeedChange() {
     } else {
         // Hide custom fields
         customFields.forEach(el => el.style.display = 'none');
+    }
+}
+
+// --- Start From Mode Handling ---
+
+function handleStartFromChange() {
+    const startFrom = document.getElementById('start_from').value;
+    const label = document.getElementById('startTimeLabel');
+    const hint = document.getElementById('currentTimeHint');
+
+    if (startFrom === 'mix_dough') {
+        label.textContent = 'Start Time (Mix Dough)';
+        hint.textContent = 'Enter the time you want to start mixing the dough';
+    } else {
+        label.textContent = 'Start Time (Feed Starter)';
+        hint.textContent = 'Enter the time you will feed your starter';
+    }
+    updateStartFromHint();
+}
+
+function updateStartFromHint() {
+    const startFrom = document.getElementById('start_from').value;
+    const startFromHint = document.getElementById('startFromHint');
+    const feedingRatio = document.getElementById('feeding_ratio').value;
+
+    // Get peak hours for the selected feeding ratio
+    const PEAK_HOURS = {
+        '1:1:1': 5, '1:2:2': 7, '1:3:3': 9,
+        '1:4:4': 11, '1:5:5': 12, '1:10:10': 20
+    };
+    const peakHours = PEAK_HOURS[feedingRatio] || 5;
+
+    if (startFrom === 'mix_dough') {
+        startFromHint.textContent = `Starter feeding time will be back-calculated (${peakHours} hours before mix time based on ${feedingRatio} ratio)`;
+    } else {
+        startFromHint.textContent = `Starter will reach peak ~${peakHours} hours after feeding (based on ${feedingRatio} ratio)`;
     }
 }
 
@@ -256,6 +299,7 @@ function collectFormData() {
         existing_starter_amount: parseFloat(document.getElementById('existing_starter_amount').value),
         feeding_ratio: document.getElementById('feeding_ratio').value,
         start_time: document.getElementById('start_time').value,
+        start_from: document.getElementById('start_from').value,
         temperature_f: parseFloat(document.getElementById('temperature_f').value),
         cold_proof_hours: parseFloat(document.getElementById('cold_proof_hours').value),
         flour_type: document.getElementById('flour_type').value,

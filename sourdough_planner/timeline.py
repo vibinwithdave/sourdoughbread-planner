@@ -235,12 +235,13 @@ class TimelineGenerator:
     def generate_timeline(self, start_time_str, feeding_ratio_peak_hours,
                           temperature_f=70, cold_proof_hours=24,
                           enabled_steps=None, custom_durations=None,
-                          start_date=None, fold_interval_minutes=30):
+                          start_date=None, fold_interval_minutes=30,
+                          start_from='feed_starter'):
         """
         Generate a complete baking timeline.
 
         Args:
-            start_time_str: Time to feed starter (e.g., "8:00 AM")
+            start_time_str: The user's start time (e.g., "8:00 AM")
             feeding_ratio_peak_hours: Hours for starter to reach peak
             temperature_f: Ambient kitchen temperature in °F
             cold_proof_hours: Duration of cold proof in hours (1-48)
@@ -248,6 +249,9 @@ class TimelineGenerator:
             custom_durations: Dict of step_id -> minutes for customizable steps
             start_date: Date to start (defaults to today)
             fold_interval_minutes: Minutes between stretch and fold sets
+            start_from: Either 'feed_starter' or 'mix_dough'. If 'mix_dough',
+                        the start_time_str is when the user wants to mix, and
+                        the feeding time is back-calculated from peak_hours.
 
         Returns:
             List of timeline entries with datetime, step info, and visual cues
@@ -263,7 +267,16 @@ class TimelineGenerator:
 
         # Parse start time
         start_time = self._parse_time(start_time_str)
-        current_dt = datetime.combine(start_date, start_time)
+        user_dt = datetime.combine(start_date, start_time)
+
+        # Determine the feed_starter datetime based on start_from mode
+        if start_from == 'mix_dough':
+            # User provided the time they want to mix dough.
+            # Mix happens when starter is at peak, so feed time = mix_time - peak_hours
+            current_dt = user_dt - timedelta(hours=feeding_ratio_peak_hours)
+        else:
+            # Default: user provided the time they will feed the starter
+            current_dt = user_dt
 
         # Calculate bulk fermentation time based on temperature
         bulk_hours = self.estimate_bulk_fermentation_hours(temperature_f)

@@ -140,7 +140,16 @@
 
                     <div class="form-grid">
                         <div class="form-group">
-                            <label for="start_time">Starter Feeding Time</label>
+                            <label for="start_from">Start From</label>
+                            <select id="start_from" name="start_from">
+                                <option value="feed_starter" selected>Feeding Starter</option>
+                                <option value="mix_dough">Mixing Dough</option>
+                            </select>
+                            <span class="form-hint" id="startFromHint">Choose whether your start time is when you feed the starter or when you want to mix the dough</span>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="start_time" id="startTimeLabel">Start Time</label>
                             <input type="text" id="start_time" name="start_time" placeholder="e.g., 8:00 PM">
                             <span class="form-hint" id="currentTimeHint">Will auto-fill with current time</span>
                         </div>
