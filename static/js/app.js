@@ -32,15 +32,19 @@ document.addEventListener('DOMContentLoaded', function () {
 
 function initializeForm() {
     const now = new Date();
-    let hours = now.getHours();
+    const hours24 = now.getHours();
     const minutes = now.getMinutes();
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    hours = hours % 12 || 12;
+    const hoursStr = hours24 < 10 ? '0' + hours24 : String(hours24);
     const minutesStr = minutes < 10 ? '0' + minutes : String(minutes);
-    const currentTime = `${hours}:${minutesStr} ${ampm}`;
+    const currentTime24 = `${hoursStr}:${minutesStr}`;
 
-    document.getElementById('start_time').value = currentTime;
-    document.getElementById('currentTimeHint').textContent = `Current time: ${currentTime}`;
+    // Display time in 12-hour format for the hint
+    let hours12 = hours24 % 12 || 12;
+    const ampm = hours24 >= 12 ? 'PM' : 'AM';
+    const displayTime = `${hours12}:${minutesStr} ${ampm}`;
+
+    document.getElementById('start_time').value = currentTime24;
+    document.getElementById('currentTimeHint').textContent = `Current time: ${displayTime}`;
 
     handleStartFromChange();
     updateBulkEstimate();
@@ -277,6 +281,17 @@ async function handleFormSubmit(e) {
     }
 }
 
+function convertTo12Hour(time24) {
+    // Convert "HH:MM" (24-hour) to "H:MM AM/PM" format
+    if (!time24 || !time24.includes(':')) return time24;
+    const [hoursStr, minutesStr] = time24.split(':');
+    let hours = parseInt(hoursStr, 10);
+    const minutes = minutesStr;
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12 || 12;
+    return `${hours}:${minutes} ${ampm}`;
+}
+
 function collectFormData() {
     const speed = document.getElementById('fermentation_speed').value;
 
@@ -298,7 +313,7 @@ function collectFormData() {
         salt_percent: parseFloat(document.getElementById('salt_percent').value),
         existing_starter_amount: parseFloat(document.getElementById('existing_starter_amount').value),
         feeding_ratio: document.getElementById('feeding_ratio').value,
-        start_time: document.getElementById('start_time').value,
+        start_time: convertTo12Hour(document.getElementById('start_time').value),
         start_from: document.getElementById('start_from').value,
         temperature_f: parseFloat(document.getElementById('temperature_f').value),
         cold_proof_hours: parseFloat(document.getElementById('cold_proof_hours').value),

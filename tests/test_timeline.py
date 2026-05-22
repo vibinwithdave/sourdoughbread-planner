@@ -289,8 +289,8 @@ class TestTimeParsing:
         assert time.hour == 9
 
     def test_no_ampm_evening(self, tl):
-        time = tl._parse_time('1:00')
-        assert time.hour == 13  # Assumes PM for hours 1-5
+        time = tl._parse_time('13:00')
+        assert time.hour == 13  # 24-hour format for 1 PM
 
     def test_noon(self, tl):
         time = tl._parse_time('12:00 PM')

@@ -603,20 +603,40 @@ class TimelineGenerator:
         return sorted_days
 
     def _parse_time(self, time_str):
-        """Parse time string in 12-hour format."""
-        time_str = time_str.strip().upper()
+        """Parse time string in multiple formats: 24-hour (HH:MM), 12-hour with/without space."""
+        time_str = time_str.strip()
 
-        if not ('AM' in time_str or 'PM' in time_str):
-            hour = int(time_str.split(':')[0])
-            if 6 <= hour <= 11:
-                time_str += ' AM'
-            else:
-                time_str += ' PM'
-
-        try:
-            return datetime.strptime(time_str, '%I:%M %p').time()
-        except ValueError:
+        # Try 24-hour format first (HH:MM) - from <input type="time">
+        if len(time_str) == 5 and time_str[2] == ':' and time_str[:2].isdigit() and time_str[3:].isdigit():
             try:
-                return datetime.strptime(time_str, '%I %p').time()
+                return datetime.strptime(time_str, '%H:%M').time()
             except ValueError:
-                raise ValueError(f"Invalid time format: {time_str}. Use format like '8:00 AM'")
+                pass
+
+        # Also try 24-hour without leading zero (e.g., "8:30")
+        time_upper = time_str.upper()
+
+        # Handle no AM/PM - try as 24-hour
+        if 'AM' not in time_upper and 'PM' not in time_upper:
+            try:
+                return datetime.strptime(time_str, '%H:%M').time()
+            except ValueError:
+                # Guess AM/PM based on hour
+                hour = int(time_str.split(':')[0])
+                if 6 <= hour <= 11:
+                    time_upper = time_str + ' AM'
+                else:
+                    time_upper = time_str + ' PM'
+        
+        # Normalize: insert space before AM/PM if missing (e.g., "9:19AM" -> "9:19 AM")
+        import re
+        time_upper = re.sub(r'(\d)(AM|PM)', r'\1 \2', time_upper)
+
+        # Try standard 12-hour formats
+        for fmt in ['%I:%M %p', '%I %p', '%I:%M%p']:
+            try:
+                return datetime.strptime(time_upper, fmt).time()
+            except ValueError:
+                continue
+
+        raise ValueError(f"Invalid time format: {time_str}. Use the time picker or format like '8:00 AM'")
