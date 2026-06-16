@@ -85,19 +85,26 @@ class IngredientCalculator:
         Derive flour and water from the starter amount and fermentation speed.
 
         The speed defines a ratio between starter, water, and flour.
-        Given the user's starter amount, flour and water are scaled proportionally.
+        The flour and water in the ratio are the amounts ADDED DIRECTLY to the dough
+        (not inclusive of what's inside the starter).
 
-        For example, 'slow' ratio is 50:375:500. If user inputs 25g starter:
-          - flour = 25 * (500/50) = 250g
-          - water = 25 * (375/50) = 187.5g
+        For example, 'fast' ratio is 100:375:500. With 100g starter:
+          - flour to add = 500g
+          - water to add = 375g
+          - salt = 500g * 2.2% = 11g
+          - total dough = 100 + 500 + 375 + 11 = 986g
+
+        If user inputs 50g starter at 'fast' (100:375:500):
+          - flour to add = 50 * (500/100) = 250g
+          - water to add = 50 * (375/100) = 187.5g
 
         Args:
             starter_amount: Grams of active starter the user wants to use
             speed: One of 'slow', 'regular', 'fast'
-            salt_percent: Salt as % of total flour (default 2.2)
+            salt_percent: Salt as % of flour added to dough (default 2.2)
 
         Returns:
-            dict with total_flour, total_water, salt, additional_flour, additional_water, etc.
+            dict with flour, water (amounts to add), salt, totals, etc.
         """
         if speed not in self.SPEED_RATIOS:
             raise ValueError(f"Invalid speed: {speed}. Must be one of: {list(self.SPEED_RATIOS.keys())}")
@@ -105,27 +112,27 @@ class IngredientCalculator:
         ratio = self.SPEED_RATIOS[speed]
         scale_factor = starter_amount / ratio['starter']
 
-        total_flour = ratio['flour'] * scale_factor
-        total_water = ratio['water'] * scale_factor
-        salt = total_flour * (salt_percent / 100)
+        # These are the amounts you ADD to the dough (not inclusive of starter)
+        flour_to_add = ratio['flour'] * scale_factor
+        water_to_add = ratio['water'] * scale_factor
+        salt = flour_to_add * (salt_percent / 100)
 
-        # Starter contributes flour and water (assumes 100% hydration starter)
+        # True totals include what's inside the starter (assumes 100% hydration starter)
         starter_flour_contribution = starter_amount / 2
         starter_water_contribution = starter_amount / 2
+        total_flour = flour_to_add + starter_flour_contribution
+        total_water = water_to_add + starter_water_contribution
 
-        additional_flour = total_flour - starter_flour_contribution
-        additional_water = total_water - starter_water_contribution
-
-        total_dough_weight = total_flour + total_water + salt + starter_amount
+        total_dough_weight = starter_amount + flour_to_add + water_to_add + salt
         actual_hydration = (total_water / total_flour) * 100 if total_flour > 0 else 0
 
         return {
             'starter_amount': round(starter_amount, 1),
             'speed': speed,
+            'flour_to_add': round(flour_to_add, 1),
+            'water_to_add': round(water_to_add, 1),
             'total_flour': round(total_flour, 1),
             'total_water': round(total_water, 1),
-            'additional_flour': round(additional_flour, 1),
-            'additional_water': round(additional_water, 1),
             'salt': round(salt, 1),
             'hydration': round(actual_hydration, 1),
             'salt_percent': salt_percent,
@@ -268,13 +275,22 @@ class IngredientCalculator:
             existing_starter_amount, feeding_ratio, starter_amount
         )
 
+        # For speed-based mode, flour_to_add/water_to_add are the amounts added to dough
+        # For custom mode, additional_flour/additional_water are the amounts added to dough
+        if speed and speed in self.SPEED_RATIOS:
+            flour_to_add = recipe['flour_to_add']
+            water_to_add = recipe['water_to_add']
+        else:
+            flour_to_add = recipe['additional_flour']
+            water_to_add = recipe['additional_water']
+
         return {
             'starter_amount': recipe['starter_amount'],
             'speed': recipe.get('speed', 'custom'),
-            'total_flour_weight': recipe['total_flour'],
-            'additional_flour': recipe['additional_flour'],
+            'flour_to_add': flour_to_add,
+            'water_to_add': water_to_add,
+            'total_flour': recipe['total_flour'],
             'total_water': recipe['total_water'],
-            'additional_water': recipe['additional_water'],
             'salt': recipe['salt'],
             'hydration_percent': recipe['hydration'],
             'salt_percent': recipe['salt_percent'],

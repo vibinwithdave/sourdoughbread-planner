@@ -39,79 +39,77 @@ class TestSpeedRatios:
     """Tests for the speed-based recipe derivation (primary calculation mode)."""
 
     def test_slow_base_ratio(self, calc):
-        """Slow with 50g starter should give exactly 500g flour, 375g water."""
+        """Slow with 50g starter should give exactly 500g flour to add, 375g water to add."""
         result = calc.derive_recipe_from_speed(50, 'slow')
-        assert result['total_flour'] == 500.0
-        assert result['total_water'] == 375.0
+        assert result['flour_to_add'] == 500.0
+        assert result['water_to_add'] == 375.0
         assert result['starter_amount'] == 50.0
+        # True totals include starter contribution
+        assert result['total_flour'] == 525.0  # 500 + 25 from starter
+        assert result['total_water'] == 400.0  # 375 + 25 from starter
 
     def test_regular_base_ratio(self, calc):
-        """Regular with 75g starter should give exactly 500g flour, 375g water."""
+        """Regular with 75g starter should give exactly 500g flour to add, 375g water to add."""
         result = calc.derive_recipe_from_speed(75, 'regular')
-        assert result['total_flour'] == 500.0
-        assert result['total_water'] == 375.0
+        assert result['flour_to_add'] == 500.0
+        assert result['water_to_add'] == 375.0
         assert result['starter_amount'] == 75.0
+        # True totals include starter contribution
+        assert result['total_flour'] == 537.5  # 500 + 37.5 from starter
+        assert result['total_water'] == 412.5  # 375 + 37.5 from starter
 
     def test_fast_base_ratio(self, calc):
-        """Fast with 100g starter should give exactly 500g flour, 375g water."""
+        """Fast with 100g starter should give exactly 500g flour to add, 375g water to add."""
         result = calc.derive_recipe_from_speed(100, 'fast')
-        assert result['total_flour'] == 500.0
-        assert result['total_water'] == 375.0
+        assert result['flour_to_add'] == 500.0
+        assert result['water_to_add'] == 375.0
         assert result['starter_amount'] == 100.0
+        # True totals include starter contribution
+        assert result['total_flour'] == 550.0  # 500 + 50 from starter
+        assert result['total_water'] == 425.0  # 375 + 50 from starter
 
     def test_slow_scaled_down(self, calc):
         """Slow with 25g starter should scale proportionally (0.5x)."""
         result = calc.derive_recipe_from_speed(25, 'slow')
-        assert result['total_flour'] == 250.0
-        assert result['total_water'] == 187.5
+        assert result['flour_to_add'] == 250.0
+        assert result['water_to_add'] == 187.5
 
     def test_regular_scaled_down(self, calc):
         """Regular with 25g starter should scale proportionally."""
         result = calc.derive_recipe_from_speed(25, 'regular')
         # 25 / 75 = 0.333... scale factor
-        assert abs(result['total_flour'] - 166.7) < 0.1
-        assert abs(result['total_water'] - 125.0) < 0.1
+        assert abs(result['flour_to_add'] - 166.7) < 0.1
+        assert abs(result['water_to_add'] - 125.0) < 0.1
 
     def test_fast_scaled_up(self, calc):
         """Fast with 200g starter should scale proportionally (2x)."""
         result = calc.derive_recipe_from_speed(200, 'fast')
-        assert result['total_flour'] == 1000.0
-        assert result['total_water'] == 750.0
+        assert result['flour_to_add'] == 1000.0
+        assert result['water_to_add'] == 750.0
 
     def test_slow_scaled_up(self, calc):
         """Slow with 150g starter should scale proportionally (3x)."""
         result = calc.derive_recipe_from_speed(150, 'slow')
-        assert result['total_flour'] == 1500.0
-        assert result['total_water'] == 1125.0
+        assert result['flour_to_add'] == 1500.0
+        assert result['water_to_add'] == 1125.0
 
-    def test_hydration_is_consistent_across_speeds(self, calc):
-        """All speeds should produce 75% hydration (375/500 = 0.75)."""
-        for speed in ['slow', 'regular', 'fast']:
-            result = calc.derive_recipe_from_speed(100, speed)
-            assert result['hydration'] == 75.0
+    def test_hydration_is_true_hydration(self, calc):
+        """Hydration should be true hydration: total_water / total_flour."""
+        result = calc.derive_recipe_from_speed(100, 'fast')
+        # total_water = 425, total_flour = 550 -> 77.3%
+        expected = (425.0 / 550.0) * 100
+        assert abs(result['hydration'] - expected) < 0.1
 
     def test_salt_calculation(self, calc):
-        """Salt should be calculated as percentage of total flour."""
+        """Salt should be calculated as percentage of flour added to dough."""
         result = calc.derive_recipe_from_speed(50, 'slow', salt_percent=2.2)
-        # 500g flour * 2.2% = 11g
+        # 500g flour_to_add * 2.2% = 11g
         assert result['salt'] == 11.0
 
-    def test_additional_flour_accounts_for_starter(self, calc):
-        """Additional flour should subtract starter's flour contribution."""
-        result = calc.derive_recipe_from_speed(100, 'fast')
-        # Total flour = 500, starter contributes 50g flour (half of 100g)
-        assert result['additional_flour'] == 450.0
-
-    def test_additional_water_accounts_for_starter(self, calc):
-        """Additional water should subtract starter's water contribution."""
-        result = calc.derive_recipe_from_speed(100, 'fast')
-        # Total water = 375, starter contributes 50g water (half of 100g)
-        assert result['additional_water'] == 325.0
-
     def test_total_dough_weight(self, calc):
-        """Total dough weight = flour + water + salt + starter."""
+        """Total dough weight = starter + flour_to_add + water_to_add + salt."""
         result = calc.derive_recipe_from_speed(100, 'fast', salt_percent=2.2)
-        expected = 500 + 375 + 11 + 100
+        expected = 100 + 500 + 375 + 11
         assert result['total_dough_weight'] == expected
 
     def test_invalid_speed_raises_error(self, calc):
@@ -211,8 +209,8 @@ class TestCalculateIngredients:
             speed='slow',
             salt_percent=2.2
         )
-        assert result['total_flour_weight'] == 500.0
-        assert result['total_water'] == 375.0
+        assert result['flour_to_add'] == 500.0
+        assert result['water_to_add'] == 375.0
         assert result['speed'] == 'slow'
 
     def test_speed_mode_regular(self, calc):
@@ -224,8 +222,8 @@ class TestCalculateIngredients:
             speed='regular',
             salt_percent=2.2
         )
-        assert result['total_flour_weight'] == 500.0
-        assert result['total_water'] == 375.0
+        assert result['flour_to_add'] == 500.0
+        assert result['water_to_add'] == 375.0
         assert result['speed'] == 'regular'
 
     def test_speed_mode_fast(self, calc):
@@ -237,8 +235,8 @@ class TestCalculateIngredients:
             speed='fast',
             salt_percent=2.2
         )
-        assert result['total_flour_weight'] == 500.0
-        assert result['total_water'] == 375.0
+        assert result['flour_to_add'] == 500.0
+        assert result['water_to_add'] == 375.0
         assert result['speed'] == 'fast'
 
     def test_custom_mode(self, calc):
@@ -252,12 +250,12 @@ class TestCalculateIngredients:
             hydration=75,
             salt_percent=2.2
         )
-        assert result['total_flour_weight'] == 500.0
-        assert result['total_water'] == 375.0
+        assert result['flour_to_add'] == 450.0
+        assert result['water_to_add'] == 325.0
         assert result['speed'] == 'custom'
 
     def test_25g_starter_slow(self, calc):
-        """25g starter at slow speed should scale to 250g flour, 187.5g water."""
+        """25g starter at slow speed should scale to 250g flour to add, 187.5g water to add."""
         result = calc.calculate_ingredients(
             starter_amount=25,
             existing_starter_amount=25,
@@ -265,8 +263,8 @@ class TestCalculateIngredients:
             speed='slow',
             salt_percent=2.2
         )
-        assert result['total_flour_weight'] == 250.0
-        assert result['total_water'] == 187.5
+        assert result['flour_to_add'] == 250.0
+        assert result['water_to_add'] == 187.5
 
     def test_includes_starter_feeding(self, calc):
         """Should include starter feeding calculations."""

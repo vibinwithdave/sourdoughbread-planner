@@ -150,40 +150,43 @@ function updateRecipePreview() {
     const speed = document.getElementById('fermentation_speed').value;
     const saltPercent = parseFloat(document.getElementById('salt_percent').value) || 2.2;
 
-    let totalFlour, totalWater;
+    let flourToAdd, waterToAdd;
 
     if (speed !== 'custom' && SPEED_RATIOS[speed]) {
-        // Speed-based: scale flour and water from the ratio
+        // Speed-based: flour and water from the ratio are what you ADD to the dough
         const ratio = SPEED_RATIOS[speed];
         const scaleFactor = starterAmount / ratio.starter;
-        totalFlour = ratio.flour * scaleFactor;
-        totalWater = ratio.water * scaleFactor;
+        flourToAdd = ratio.flour * scaleFactor;
+        waterToAdd = ratio.water * scaleFactor;
     } else {
         // Custom: use starter % and hydration %
         const starterPercent = parseFloat(document.getElementById('starter_percent').value) || 20;
         const hydration = parseFloat(document.getElementById('hydration').value) || 75;
         if (starterPercent <= 0) return;
-        totalFlour = starterAmount / (starterPercent / 100);
-        totalWater = totalFlour * (hydration / 100);
+        const totalFlour = starterAmount / (starterPercent / 100);
+        const totalWater = totalFlour * (hydration / 100);
+        // In custom mode, subtract starter contribution
+        flourToAdd = totalFlour - (starterAmount / 2);
+        waterToAdd = totalWater - (starterAmount / 2);
     }
 
-    const salt = totalFlour * (saltPercent / 100);
+    const salt = flourToAdd * (saltPercent / 100);
 
-    // Starter is 100% hydration: half flour, half water
-    const additionalFlour = totalFlour - (starterAmount / 2);
-    const additionalWater = totalWater - (starterAmount / 2);
-    const totalDough = totalFlour + totalWater + salt + starterAmount;
+    // True totals include starter contribution (100% hydration starter)
+    const totalFlour = flourToAdd + (starterAmount / 2);
+    const totalWater = waterToAdd + (starterAmount / 2);
+    const totalDough = starterAmount + flourToAdd + waterToAdd + salt;
 
-    // Update preview display
-    document.getElementById('previewFlour').textContent = `${Math.round(totalFlour)}g`;
-    document.getElementById('previewWater').textContent = `${Math.round(totalWater)}g`;
+    // Update preview display - show what you ADD to the dough
+    document.getElementById('previewFlour').textContent = `${Math.round(flourToAdd)}g`;
+    document.getElementById('previewWater').textContent = `${Math.round(waterToAdd)}g`;
     document.getElementById('previewSalt').textContent = `${roundTo(salt, 1)}g`;
     document.getElementById('previewStarter').textContent = `${Math.round(starterAmount)}g`;
     document.getElementById('previewTotal').textContent = `${Math.round(totalDough)}g`;
 
-    // Update breakdown
-    document.getElementById('previewAddFlour').textContent = Math.round(additionalFlour);
-    document.getElementById('previewAddWater').textContent = Math.round(additionalWater);
+    // Update breakdown line
+    document.getElementById('previewAddFlour').textContent = Math.round(flourToAdd);
+    document.getElementById('previewAddWater').textContent = Math.round(waterToAdd);
     document.getElementById('previewAddStarter').textContent = Math.round(starterAmount);
     document.getElementById('previewAddSalt').textContent = roundTo(salt, 1);
 }
@@ -384,11 +387,11 @@ function renderIngredients(ingredients, settings) {
         </div>
         <div class="ingredient-row">
             <span class="label">${settings.flour_type}</span>
-            <span class="value">${ingredients.additional_flour}g</span>
+            <span class="value">${ingredients.flour_to_add}g</span>
         </div>
         <div class="ingredient-row">
             <span class="label">Water</span>
-            <span class="value">${ingredients.additional_water}g</span>
+            <span class="value">${ingredients.water_to_add}g</span>
         </div>
         <div class="ingredient-row">
             <span class="label">Salt</span>
@@ -398,11 +401,11 @@ function renderIngredients(ingredients, settings) {
 
     document.getElementById('totalsResults').innerHTML = `
         <div class="ingredient-row">
-            <span class="label">Total Flour</span>
-            <span class="value">${ingredients.total_flour_weight}g</span>
+            <span class="label">Total Flour (incl. starter)</span>
+            <span class="value">${ingredients.total_flour}g</span>
         </div>
         <div class="ingredient-row">
-            <span class="label">Total Water</span>
+            <span class="label">Total Water (incl. starter)</span>
             <span class="value">${ingredients.total_water}g</span>
         </div>
         <div class="ingredient-row">
@@ -687,8 +690,8 @@ function exportSchedule() {
     }
     text += `Main Dough:\n`;
     text += `  Starter: ${currentIngredients.starter_amount}g\n`;
-    text += `  Flour: ${currentIngredients.additional_flour}g\n`;
-    text += `  Water: ${currentIngredients.additional_water}g\n`;
+    text += `  Flour: ${currentIngredients.flour_to_add}g\n`;
+    text += `  Water: ${currentIngredients.water_to_add}g\n`;
     text += `  Salt: ${currentIngredients.salt}g\n`;
     text += `  Total Dough: ${currentIngredients.total_dough_weight}g\n\n`;
 
