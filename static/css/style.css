@@ -80,6 +80,23 @@ body {
     margin: 0 auto;
 }
 
+.app-header .recipe-link {
+    color: var(--color-text-light);
+    font-size: 0.85rem;
+    margin-top: 0.5rem;
+}
+
+.app-header .recipe-link a {
+    color: var(--color-primary);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.app-header .recipe-link a:hover {
+    text-decoration: underline;
+    color: var(--color-primary-light);
+}
+
 /* --- Form Sections --- */
 .form-section {
     background: var(--color-surface);
